@@ -139,53 +139,53 @@ const mergeHistorySessions = (localSessions, remoteSessions) => {
 
 /** Hero developer badge & welcome section */
 const DeveloperHero = () => (
-  <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 z-10 relative mb-3 sm:mb-4 mt-1 sm:mt-2">
-    <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-6 md:gap-10">
+  <div className="w-full max-w-5xl mx-auto px-2 sm:px-4 z-10 relative mb-4 sm:mb-6 mt-1 sm:mt-2">
+    <div className="flex items-center justify-between sm:justify-center gap-2 xs:gap-3 sm:gap-6 md:gap-10">
       {/* Left Developer: Yashwanth N */}
       <div className="flex flex-col items-center flex-shrink-0 group">
-        <div className="relative p-0.5 sm:p-1 rounded-2xl bg-gradient-to-b from-white/20 via-white/5 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.06)] ring-1 ring-white/15">
+        <div className="relative p-1 sm:p-1.5 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-white/25 via-white/10 to-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_25px_rgba(255,255,255,0.08)] ring-1 ring-white/20">
           <img
             src="/developers/yashwanth.jpg"
             alt="Yashwanth N - Developer"
-            className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover object-top rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105"
+            className="w-20 h-20 xs:w-24 xs:h-24 sm:w-28 sm:h-28 md:w-36 md:h-36 lg:w-40 lg:h-40 object-cover object-top rounded-xl sm:rounded-2xl shadow-xl transition-all duration-300 group-hover:scale-105"
             loading="eager"
-            width="96"
-            height="96"
+            width="160"
+            height="160"
           />
           <div
-            className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500 rounded-full border-2 border-[#0a0a0c]"
+            className="absolute -bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5 w-3.5 h-3.5 sm:w-5 sm:h-5 bg-emerald-500 rounded-full border-2 sm:border-[3px] border-[#0a0a0c] shadow-[0_0_10px_rgba(16,185,129,0.8)]"
             title="Active Developer"
           />
         </div>
-        <span className="mt-1.5 text-[9px] sm:text-[11px] font-pixel text-slate-200 tracking-wide text-center font-semibold max-w-[70px] sm:max-w-none truncate sm:overflow-visible">
+        <span className="mt-2 text-[10px] xs:text-xs sm:text-sm md:text-base font-pixel text-slate-100 tracking-wide text-center font-bold">
           Yashwanth N
         </span>
-        <span className="text-[7.5px] sm:text-[9px] font-mono text-emerald-400/90 tracking-tight text-center uppercase">
+        <span className="text-[7.5px] xs:text-[8.5px] sm:text-[10px] md:text-xs font-mono text-emerald-400 font-semibold tracking-wider text-center uppercase">
           Developer
         </span>
       </div>
 
       {/* Center: Welcome Text */}
-      <div className="text-center flex-1 max-w-md sm:max-w-lg min-w-0">
+      <div className="text-center flex-1 max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg min-w-0 px-1 sm:px-2">
         <h1 className="sr-only">
           IplAuctoWorld - Fan-Made Multiplayer T20 Cricket Auction Simulator
         </h1>
 
-        <div className="text-[clamp(1.1rem,2.8vw,2.35rem)] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white via-white/90 to-white/60">
+        <div className="text-[clamp(1.15rem,2.8vw,2.35rem)] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white via-white/90 to-white/60">
           CREATE YOUR
         </div>
-        <div className="text-[clamp(1.7rem,5.4vw,3.85rem)] font-pixel leading-none uppercase text-balance mt-0.5 sm:mt-1 drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
+        <div className="text-[clamp(1.75rem,5.2vw,3.85rem)] font-pixel leading-none uppercase text-balance mt-1 sm:mt-1.5 drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
           AUCTION ROOM
         </div>
 
-        <p className="text-xs sm:text-[13px] text-slate-400 font-pixel max-w-lg mx-auto mt-2 leading-relaxed px-1 hidden xs:block">
+        <p className="text-xs sm:text-[13px] text-slate-400 font-pixel max-w-lg mx-auto mt-2 leading-relaxed px-1 hidden sm:block">
           The ultimate multiplayer IPL auction simulator and game. Host live IPL
           mega auctions with friends in real-time, choose your favorite
           franchise, bid strategically, and build a championship T20 squad.
         </p>
 
         {/* Micro Step Indicators */}
-        <div className="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 mt-2.5 sm:mt-3 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-[8px] sm:text-[9.5px] font-black tracking-wider sm:tracking-widest text-slate-400 uppercase select-none">
+        <div className="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 mt-2 sm:mt-3 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-[8px] sm:text-[9.5px] font-black tracking-wider sm:tracking-widest text-slate-400 uppercase select-none">
           <span className="hover:text-slate-200 transition-colors">
             ① Create Room
           </span>
@@ -202,31 +202,31 @@ const DeveloperHero = () => (
 
       {/* Right Developer: Vishal Pujari */}
       <div className="flex flex-col items-center flex-shrink-0 group">
-        <div className="relative p-0.5 sm:p-1 rounded-2xl bg-gradient-to-b from-white/20 via-white/5 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.06)] ring-1 ring-white/15">
+        <div className="relative p-1 sm:p-1.5 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-white/25 via-white/10 to-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_25px_rgba(255,255,255,0.08)] ring-1 ring-white/20">
           <img
             src="/developers/vishal.jpg"
             alt="Vishal Pujari - Developer"
-            className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover object-top rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105"
+            className="w-20 h-20 xs:w-24 xs:h-24 sm:w-28 sm:h-28 md:w-36 md:h-36 lg:w-40 lg:h-40 object-cover object-top rounded-xl sm:rounded-2xl shadow-xl transition-all duration-300 group-hover:scale-105"
             loading="eager"
-            width="96"
-            height="96"
+            width="160"
+            height="160"
           />
           <div
-            className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500 rounded-full border-2 border-[#0a0a0c]"
+            className="absolute -bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5 w-3.5 h-3.5 sm:w-5 sm:h-5 bg-emerald-500 rounded-full border-2 sm:border-[3px] border-[#0a0a0c] shadow-[0_0_10px_rgba(16,185,129,0.8)]"
             title="Active Developer"
           />
         </div>
-        <span className="mt-1.5 text-[9px] sm:text-[11px] font-pixel text-slate-200 tracking-wide text-center font-semibold max-w-[70px] sm:max-w-none truncate sm:overflow-visible">
+        <span className="mt-2 text-[10px] xs:text-xs sm:text-sm md:text-base font-pixel text-slate-100 tracking-wide text-center font-bold">
           Vishal Pujari
         </span>
-        <span className="text-[7.5px] sm:text-[9px] font-mono text-emerald-400/90 tracking-tight text-center uppercase">
+        <span className="text-[7.5px] xs:text-[8.5px] sm:text-[10px] md:text-xs font-mono text-emerald-400 font-semibold tracking-wider text-center uppercase">
           Developer
         </span>
       </div>
     </div>
 
-    {/* Description on tiny screens below xs */}
-    <p className="text-[11px] text-slate-400 font-pixel text-center mt-2 leading-relaxed px-1 block xs:hidden">
+    {/* Description on mobile screens below sm */}
+    <p className="text-[11px] sm:text-xs text-slate-400 font-pixel text-center mt-2.5 leading-relaxed px-2 block sm:hidden">
       The ultimate multiplayer IPL auction simulator and game. Host live IPL
       mega auctions with friends in real-time.
     </p>
@@ -729,7 +729,7 @@ const LandingPage = () => {
   // ─── Not Signed In: Show Google / Guest Login ───
   if (!user) {
     return (
-      <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto">
+      <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white">
         <PageBackground />
 
         <div className="relative z-50 w-full">
@@ -861,7 +861,7 @@ const LandingPage = () => {
 
   // ─── Signed In: Show Create / Join / History ───
   return (
-    <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto">
+    <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white">
       <PageBackground />
 
       <div className="relative z-50 w-full">

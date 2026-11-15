@@ -38,7 +38,7 @@ function App() {
         <ConnectionAlertProvider>
           <AuthProvider>
             <AuctionProvider>
-              <div className="min-h-screen w-full bg-ipl-dark text-white overflow-x-hidden">
+              <div className="min-h-screen w-full bg-ipl-dark text-white">
                 {/* Modals are not needed on first paint — lazy load them */}
                 <Suspense fallback={null}>
                   <ConnectionAlertModal />

@@ -36,8 +36,6 @@ html {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
@@ -50,10 +48,10 @@ body {
   color: white;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-  overflow-y: auto;
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -290,13 +288,12 @@ button, .no-select {
 }
 
 /* ── Scroll container optimizations ─────────────────────────────────────────
-   contain:paint limits repaint scope; touch-action speeds up swipe handling  */
+   Smooth momentum touch scrolling for inner scrollable sections            */
 [class*="overflow-y-auto"],
 [class*="overflow-y-scroll"],
 [class*="overflow-auto"],
 [class*="overflow-scroll"] {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 
 /* ── Reduce expensive filter effects on low-power mobile screens ─────────── */
