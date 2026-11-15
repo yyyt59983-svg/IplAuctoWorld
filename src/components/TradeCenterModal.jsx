@@ -11,20 +11,31 @@ import {
   Sparkles,
   ChevronRight,
   TrendingUp,
+  Check,
+  Clock,
+  User,
+  Inbox,
+  Send,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { TEAMS } from '../data/teams';
 import { toFiniteNumber, formatCrores, countOverseas, isOverseasPlayer } from '../lib/auctionDisplay';
 import { validatePlayerTrade } from '../lib/auctionRules';
 import { evaluateBotTrade } from '../lib/botEngine';
+import { getTeamInitialState } from '../data/retentions';
 
 export default function TradeCenterModal({
   isOpen,
   onClose,
   myTeam,
   allTeams = [],
+  incomingTrades = [],
+  outgoingTrades = [],
   onExecuteTrade,
+  onRespondToTrade,
+  onCancelTrade,
 }) {
+  const [activeTab, setActiveTab] = useState('propose'); // 'propose' | 'pending'
   const myTeamId = myTeam?.teamId || myTeam?.team;
   const myTeamObj = TEAMS.find((t) => t.id === myTeamId) || TEAMS[0];
 
@@ -44,20 +55,26 @@ export default function TradeCenterModal({
   const [cashFromMe, setCashFromMe] = useState(0);
   const [tradeStatus, setTradeStatus] = useState(null); // { type: 'success' | 'error', message: string }
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processingTradeId, setProcessingTradeId] = useState(null);
 
   const partnerTeam = useMemo(() => {
-    return (
-      allTeams.find((t) => (t.teamId || t.team) === selectedPartnerId) || {
-        teamId: selectedPartnerId,
-        teamName: TEAMS.find((t) => t.id === selectedPartnerId)?.name || 'Franchise',
-        squad: [],
-        budgetRemaining: 150,
-        spent: 0,
-      }
-    );
+    const found = allTeams.find((t) => (t.teamId || t.team) === selectedPartnerId);
+    if (found) {
+      const effBudget = found.budgetRemaining ?? Math.max(0, 150 - (found.spent || 0));
+      return { ...found, budgetRemaining: effBudget };
+    }
+    const defaultInit = getTeamInitialState(selectedPartnerId, 150);
+    return {
+      teamId: selectedPartnerId,
+      teamName: TEAMS.find((t) => t.id === selectedPartnerId)?.name || 'Franchise',
+      squad: defaultInit.squad,
+      budgetRemaining: defaultInit.budgetRemaining,
+      spent: defaultInit.spent,
+    };
   }, [allTeams, selectedPartnerId]);
 
   const partnerTeamObj = TEAMS.find((t) => t.id === selectedPartnerId) || TEAMS[1];
+  const isPartnerBot = Boolean(partnerTeam?.userId && String(partnerTeam.userId).startsWith('bot_'));
 
   // My squad list
   const mySquad = useMemo(() => {
@@ -85,9 +102,9 @@ export default function TradeCenterModal({
     });
   }, [myTeam, partnerTeam, selectedPlayerToGive, selectedPlayerToReceive, cashFromMe]);
 
-  // Preview AI Coach sentiment
+  // Preview AI Coach sentiment (only for bot franchises)
   const coachSentiment = useMemo(() => {
-    if (!partnerTeam || (!selectedPlayerToGive && !selectedPlayerToReceive && cashFromMe === 0)) {
+    if (!isPartnerBot || !partnerTeam || (!selectedPlayerToGive && !selectedPlayerToReceive && cashFromMe === 0)) {
       return null;
     }
     return evaluateBotTrade({
@@ -98,7 +115,7 @@ export default function TradeCenterModal({
       cashOffered: cashFromMe,
       cashRequested: 0,
     });
-  }, [partnerTeam, myTeam, selectedPlayerToGive, selectedPlayerToReceive, cashFromMe]);
+  }, [isPartnerBot, partnerTeam, myTeam, selectedPlayerToGive, selectedPlayerToReceive, cashFromMe]);
 
   const handleTradeSubmit = async () => {
     if (!validation.isValid) return;
@@ -123,7 +140,7 @@ export default function TradeCenterModal({
           });
           setTradeStatus({
             type: 'success',
-            message: res.message || 'Trade officially executed and approved!',
+            message: res.message || 'Trade proposal successfully processed!',
           });
           setSelectedPlayerToGive(null);
           setSelectedPlayerToReceive(null);
@@ -145,7 +162,35 @@ export default function TradeCenterModal({
     }
   };
 
+  const handleRespond = async (tradeId, action) => {
+    setProcessingTradeId(tradeId);
+    try {
+      if (onRespondToTrade) {
+        await onRespondToTrade(tradeId, action);
+      }
+    } catch (e) {
+      console.error('Failed to respond to trade', e);
+    } finally {
+      setProcessingTradeId(null);
+    }
+  };
+
+  const handleCancel = async (tradeId) => {
+    setProcessingTradeId(tradeId);
+    try {
+      if (onCancelTrade) {
+        await onCancelTrade(tradeId);
+      }
+    } catch (e) {
+      console.error('Failed to cancel trade', e);
+    } finally {
+      setProcessingTradeId(null);
+    }
+  };
+
   if (!isOpen) return null;
+
+  const totalPending = (incomingTrades?.length || 0) + (outgoingTrades?.length || 0);
 
   return (
     <AnimatePresence>
@@ -157,7 +202,7 @@ export default function TradeCenterModal({
           className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-[#0e1118] via-[#090b10] to-[#050608] p-5 sm:p-7 text-white shadow-[0_25px_80px_rgba(6,182,212,0.2)]"
         >
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
                 <ArrowLeftRight className="h-6 w-6" />
@@ -177,263 +222,463 @@ export default function TradeCenterModal({
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Franchise Selector Bar */}
-          <div className="mt-4">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Select Trading Partner Franchise:
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {availableRivalTeams.map((t) => {
-                const teamId = t.teamId || t.team;
-                const meta = TEAMS.find((item) => item.id === teamId);
-                const isSelected = selectedPartnerId === teamId;
-                return (
-                  <button
-                    key={teamId}
-                    onClick={() => {
-                      setSelectedPartnerId(teamId);
-                      setSelectedPlayerToReceive(null);
-                      setTradeStatus(null);
-                    }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shrink-0 ${
-                      isSelected
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/20'
-                        : 'bg-white/[0.02] border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
-                    }`}
-                  >
-                    <span>{meta?.shortName || teamId}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">({t.squad?.length || 0})</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Trading Workbench: Split Screen */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Left: Your Squad */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
-              <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-cyan-400">Your Squad</span>
-                  <div className="font-bold text-sm text-white">{myTeamObj.name}</div>
-                </div>
-                <div className="text-right text-xs font-mono text-slate-300">
-                  Purse: ₹{formatCrores(myTeam?.budgetRemaining)} Cr
-                </div>
-              </div>
-
-              <div className="mt-3 flex-1 min-h-[160px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-                {mySquad.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-xs text-slate-500 italic py-6">
-                    No players in squad to offer
-                  </div>
-                ) : (
-                  mySquad.map((player) => {
-                    const isSelected = selectedPlayerToGive?.id === player.id;
-                    return (
-                      <div
-                        key={player.id}
-                        onClick={() => setSelectedPlayerToGive(isSelected ? null : player)}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-cyan-500/20 border-cyan-400 shadow-sm'
-                            : 'bg-white/[0.02] border-white/5 hover:border-white/15'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
-                            {player.name?.[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-white truncate">{player.name}</div>
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                              <span>{player.role}</span>
-                              {player.isRetained && (
-                                <span className="text-amber-400 font-bold">⭐ RETAINED</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right text-xs font-mono font-bold text-cyan-300">
-                          ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {selectedPlayerToGive && (
-                <div className="mt-3 p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs flex items-center justify-between">
-                  <span className="text-slate-300">Offering:</span>
-                  <span className="font-bold text-cyan-300">{selectedPlayerToGive.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Partner Squad */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
-              <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-blue-400">Target Franchise</span>
-                  <div className="font-bold text-sm text-white">{partnerTeamObj.name}</div>
-                </div>
-                <div className="text-right text-xs font-mono text-slate-300">
-                  Purse: ₹{formatCrores(partnerTeam?.budgetRemaining)} Cr
-                </div>
-              </div>
-
-              <div className="mt-3 flex-1 min-h-[160px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-                {partnerSquad.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-xs text-slate-500 italic py-6">
-                    No players in target squad
-                  </div>
-                ) : (
-                  partnerSquad.map((player) => {
-                    const isSelected = selectedPlayerToReceive?.id === player.id;
-                    return (
-                      <div
-                        key={player.id}
-                        onClick={() => setSelectedPlayerToReceive(isSelected ? null : player)}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-blue-500/20 border-blue-400 shadow-sm'
-                            : 'bg-white/[0.02] border-white/5 hover:border-white/15'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
-                            {player.name?.[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-white truncate">{player.name}</div>
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                              <span>{player.role}</span>
-                              {player.isRetained && (
-                                <span className="text-amber-400 font-bold">⭐ RETAINED</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right text-xs font-mono font-bold text-blue-300">
-                          ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {selectedPlayerToReceive && (
-                <div className="mt-3 p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs flex items-center justify-between">
-                  <span className="text-slate-300">Receiving:</span>
-                  <span className="font-bold text-blue-300">{selectedPlayerToReceive.name}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Cash consideration adjustment */}
-          <div className="mt-4 p-3 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Coins className="w-5 h-5 text-amber-400" />
-              <div>
-                <div className="text-xs font-bold text-white">Extra Purse Consideration Offered</div>
-                <div className="text-[10px] text-slate-400">Sweeten the trade deal by transferring purse funds</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {[0, 1.0, 2.5, 5.0].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setCashFromMe(amt)}
-                  className={`px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
-                    cashFromMe === amt
-                      ? 'bg-amber-400 text-black border-amber-400 shadow-md shadow-amber-400/20'
-                      : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'
-                  }`}
-                >
-                  {amt === 0 ? 'None' : `+₹${amt} Cr`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* AI Coach sentiment preview */}
-          {coachSentiment && (
-            <div className="mt-3 p-3 rounded-2xl bg-blue-950/20 border border-blue-500/30 flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-              <div>
-                <div className="text-[10px] uppercase font-bold text-cyan-300">
-                  {partnerTeamObj.botName || 'Franchise Management'} Assessment
-                </div>
-                <div className="text-xs text-slate-200 mt-0.5 italic">{coachSentiment.message}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Trade status alert */}
-          {tradeStatus && (
-            <div
-              className={`mt-3 p-3 rounded-2xl text-xs flex items-center gap-2.5 border ${
-                tradeStatus.type === 'success'
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
-                  : 'bg-red-500/15 border-red-500/40 text-red-200'
+          {/* Navigation Tabs */}
+          <div className="flex gap-2 mt-4 p-1 rounded-xl bg-white/[0.03] border border-white/10">
+            <button
+              type="button"
+              onClick={() => setActiveTab('propose')}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'propose'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              {tradeStatus.type === 'success' ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 shrink-0 text-red-400" />
-              )}
-              <span>{tradeStatus.message}</span>
-            </div>
-          )}
-
-          {/* Submission Action */}
-          <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-white/10">
-            <div className="text-xs text-slate-400">
-              {validation.isValid ? (
-                <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 className="w-4 h-4" /> Valid Trade Parameters
-                </span>
-              ) : (
-                <span className="text-amber-400 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4" /> {validation.reason}
+              Propose Transfer
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('pending')}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === 'pending'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>Pending Proposals</span>
+              {totalPending > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-cyan-400 text-slate-950">
+                  {totalPending}
                 </span>
               )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-all"
-              >
-                Close
-              </button>
-
-              <button
-                onClick={handleTradeSubmit}
-                disabled={!validation.isValid || isSubmitting}
-                className={`py-2.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all ${
-                  validation.isValid && !isSubmitting
-                    ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white hover:brightness-110 shadow-lg shadow-cyan-500/25 active:scale-[0.98]'
-                    : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/5'
-                }`}
-              >
-                <ArrowLeftRight className="w-4 h-4" />
-                <span>{isSubmitting ? 'Processing...' : 'EXECUTE TRADE DEAL'}</span>
-              </button>
-            </div>
+            </button>
           </div>
+
+          {activeTab === 'pending' ? (
+            /* Pending Trades View */
+            <div className="mt-4 space-y-4 min-h-[300px] max-h-[460px] overflow-y-auto pr-1 scrollbar-thin">
+              {/* Incoming Offers */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Inbox size={15} className="text-cyan-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-white">
+                    Incoming Trade Offers ({incomingTrades.length})
+                  </span>
+                </div>
+
+                {incomingTrades.length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center text-xs text-slate-500 italic">
+                    No pending trade offers received from other managers.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {incomingTrades.map((trade) => {
+                      const sTeam = TEAMS.find((t) => t.id === trade.senderTeamId);
+                      const isPendingThis = processingTradeId === trade.id;
+                      return (
+                        <div
+                          key={trade.id}
+                          className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/30 to-blue-950/20 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-sm text-white">
+                                {sTeam?.name || trade.senderTeamName || trade.senderTeamId}
+                              </span>
+                              <span className="text-[10px] text-slate-400">({trade.senderName || 'Manager'})</span>
+                            </div>
+                            <div className="text-xs text-slate-300 flex flex-wrap items-center gap-1.5">
+                              <span className="text-emerald-400 font-bold">Offers:</span>
+                              <span className="font-semibold text-white">
+                                {trade.playerOffered ? trade.playerOffered.name : 'None'}
+                              </span>
+                              {trade.cashOffered > 0 && (
+                                <span className="text-emerald-300 font-mono font-bold">
+                                  (+₹{formatCrores(trade.cashOffered)} Cr)
+                                </span>
+                              )}
+                              <span className="text-slate-500">⇄</span>
+                              <span className="text-rose-400 font-bold">Wants:</span>
+                              <span className="font-semibold text-white">
+                                {trade.playerRequested ? trade.playerRequested.name : 'None'}
+                              </span>
+                              {trade.cashRequested > 0 && (
+                                <span className="text-rose-300 font-mono font-bold">
+                                  (-₹{formatCrores(trade.cashRequested)} Cr)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                            <button
+                              type="button"
+                              disabled={isPendingThis}
+                              onClick={() => handleRespond(trade.id, 'decline')}
+                              className="flex-1 sm:flex-none py-1.5 px-3 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                            >
+                              Decline
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isPendingThis}
+                              onClick={() => handleRespond(trade.id, 'accept')}
+                              className="flex-1 sm:flex-none py-1.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                            >
+                              {isPendingThis ? 'Processing...' : 'Accept Trade'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Outgoing Offers */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Send size={15} className="text-cyan-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-white">
+                    Sent Proposals Awaiting Decision ({outgoingTrades.length})
+                  </span>
+                </div>
+
+                {outgoingTrades.length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center text-xs text-slate-500 italic">
+                    No active proposals awaiting other managers.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {outgoingTrades.map((trade) => {
+                      const rTeam = TEAMS.find((t) => t.id === trade.receiverTeamId);
+                      const isPendingThis = processingTradeId === trade.id;
+                      return (
+                        <div
+                          key={trade.id}
+                          className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-400">Proposal sent to:</span>
+                              <span className="font-extrabold text-sm text-cyan-300">
+                                {rTeam?.name || trade.receiverTeamName || trade.receiverTeamId}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-300 flex flex-wrap items-center gap-1.5">
+                              <span>You offered:</span>
+                              <span className="font-semibold text-white">
+                                {trade.playerOffered ? trade.playerOffered.name : 'None'}
+                              </span>
+                              {trade.cashOffered > 0 && (
+                                <span className="text-emerald-300 font-mono">
+                                  (+₹{formatCrores(trade.cashOffered)} Cr)
+                                </span>
+                              )}
+                              <span className="text-slate-500">⇄</span>
+                              <span>For:</span>
+                              <span className="font-semibold text-white">
+                                {trade.playerRequested ? trade.playerRequested.name : 'None'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={isPendingThis}
+                            onClick={() => handleCancel(trade.id)}
+                            className="py-1.5 px-3 rounded-xl border border-white/10 hover:border-rose-500/30 hover:bg-rose-500/10 text-slate-400 hover:text-rose-300 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                          >
+                            Cancel Proposal
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Propose Transfer View */
+            <>
+              {/* Franchise Selector Bar */}
+              <div className="mt-4">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Select Trading Partner Franchise:
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                  {availableRivalTeams.map((t) => {
+                    const teamId = t.teamId || t.team;
+                    const meta = TEAMS.find((item) => item.id === teamId);
+                    const isSelected = selectedPartnerId === teamId;
+                    return (
+                      <button
+                        key={teamId}
+                        onClick={() => {
+                          setSelectedPartnerId(teamId);
+                          setSelectedPlayerToReceive(null);
+                          setTradeStatus(null);
+                        }}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/20'
+                            : 'bg-white/[0.02] border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
+                        }`}
+                      >
+                        <span>{meta?.shortName || teamId}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">({t.squad?.length || 0})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Trading Workbench: Split Screen */}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left: Your Squad */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-cyan-400">Your Squad</span>
+                      <div className="font-bold text-sm text-white">{myTeamObj.name}</div>
+                    </div>
+                    <div className="text-right text-xs font-mono text-slate-300">
+                      Purse: ₹{formatCrores(myTeam?.budgetRemaining)} Cr
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex-1 min-h-[160px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                    {mySquad.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-xs text-slate-500 italic py-6">
+                        No players in squad to offer
+                      </div>
+                    ) : (
+                      mySquad.map((player) => {
+                        const isSelected = selectedPlayerToGive?.id === player.id;
+                        return (
+                          <div
+                            key={player.id}
+                            onClick={() => setSelectedPlayerToGive(isSelected ? null : player)}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-cyan-500/20 border-cyan-400 shadow-sm'
+                                : 'bg-white/[0.02] border-white/5 hover:border-white/15'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
+                                {player.name?.[0]}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-white truncate">{player.name}</div>
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                  <span>{player.role}</span>
+                                  {player.isRetained && (
+                                    <span className="text-amber-400 font-bold">⭐ RETAINED</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right text-xs font-mono font-bold text-cyan-300">
+                              ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {selectedPlayerToGive && (
+                    <div className="mt-3 p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs flex items-center justify-between">
+                      <span className="text-slate-300">Offering:</span>
+                      <span className="font-bold text-cyan-300">{selectedPlayerToGive.name}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Partner Squad */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-blue-400">Target Franchise</span>
+                      <div className="font-bold text-sm text-white">{partnerTeamObj.name}</div>
+                    </div>
+                    <div className="text-right text-xs font-mono text-slate-300">
+                      Purse: ₹{formatCrores(partnerTeam?.budgetRemaining)} Cr
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex-1 min-h-[160px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                    {partnerSquad.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-xs text-slate-500 italic py-6">
+                        No players in target squad
+                      </div>
+                    ) : (
+                      partnerSquad.map((player) => {
+                        const isSelected = selectedPlayerToReceive?.id === player.id;
+                        return (
+                          <div
+                            key={player.id}
+                            onClick={() => setSelectedPlayerToReceive(isSelected ? null : player)}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-blue-500/20 border-blue-400 shadow-sm'
+                                : 'bg-white/[0.02] border-white/5 hover:border-white/15'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
+                                {player.name?.[0]}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-white truncate">{player.name}</div>
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                  <span>{player.role}</span>
+                                  {player.isRetained && (
+                                    <span className="text-amber-400 font-bold">⭐ RETAINED</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right text-xs font-mono font-bold text-blue-300">
+                              ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {selectedPlayerToReceive && (
+                    <div className="mt-3 p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs flex items-center justify-between">
+                      <span className="text-slate-300">Receiving:</span>
+                      <span className="font-bold text-blue-300">{selectedPlayerToReceive.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cash consideration adjustment */}
+              <div className="mt-4 p-3 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <div className="text-xs font-bold text-white">Extra Purse Consideration Offered</div>
+                    <div className="text-[10px] text-slate-400">Sweeten the trade deal by transferring purse funds</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {[0, 1.0, 2.5, 5.0].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setCashFromMe(amt)}
+                      className={`px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
+                        cashFromMe === amt
+                          ? 'bg-amber-400 text-black border-amber-400 shadow-md shadow-amber-400/20'
+                          : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'
+                      }`}
+                    >
+                      {amt === 0 ? 'None' : `+₹${amt} Cr`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Coach Sentiment or Human Player Notification */}
+              {isPartnerBot ? (
+                coachSentiment && (
+                  <div className="mt-3 p-3 rounded-2xl bg-blue-950/20 border border-blue-500/30 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-cyan-300">
+                        {partnerTeamObj.botName || 'Franchise Management'} Assessment
+                      </div>
+                      <div className="text-xs text-slate-200 mt-0.5 italic">{coachSentiment.message}</div>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="mt-3 p-3 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-cyan-300">
+                      Human Franchise Owner: {partnerTeamObj.name}
+                    </div>
+                    <div className="text-xs text-slate-200 mt-0.5">
+                      This franchise is managed by another player. Submitting this proposal will prompt the owner to Review, Accept, or Decline the trade.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Trade status alert */}
+              {tradeStatus && (
+                <div
+                  className={`mt-3 p-3 rounded-2xl text-xs flex items-center gap-2.5 border ${
+                    tradeStatus.type === 'success'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                      : 'bg-red-500/15 border-red-500/40 text-red-200'
+                  }`}
+                >
+                  {tradeStatus.type === 'success' ? (
+                    <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 shrink-0 text-red-400" />
+                  )}
+                  <span>{tradeStatus.message}</span>
+                </div>
+              )}
+
+              {/* Submission Action */}
+              <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+                <div className="text-xs text-slate-400">
+                  {validation.isValid ? (
+                    <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                      <CheckCircle2 className="w-4 h-4" /> Valid Trade Parameters
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" /> {validation.reason}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onClose}
+                    className="py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-all cursor-pointer"
+                  >
+                    Close
+                  </button>
+
+                  <button
+                    onClick={handleTradeSubmit}
+                    disabled={!validation.isValid || isSubmitting}
+                    className={`py-2.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                      validation.isValid && !isSubmitting
+                        ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white hover:brightness-110 shadow-lg shadow-cyan-500/25 active:scale-[0.98]'
+                        : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/5'
+                    }`}
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <span>
+                      {isSubmitting
+                        ? 'Processing...'
+                        : isPartnerBot
+                        ? 'EXECUTE TRADE DEAL'
+                        : 'SUBMIT TRADE PROPOSAL'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

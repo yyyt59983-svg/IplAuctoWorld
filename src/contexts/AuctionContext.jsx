@@ -48,7 +48,7 @@ import { useAuth } from './AuthContext';
 import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
-import { pausedRemainingMs, toFiniteNumber } from '../lib/auctionDisplay';
+import { pausedRemainingMs, toFiniteNumber, isOverseasPlayer } from '../lib/auctionDisplay';
 import {
   countAuctionTeams,
   finalizedLotRecoveryDelay,
@@ -164,7 +164,26 @@ export const AuctionProvider = ({ children }) => {
   const [team, setTeam] = useState(null);
   const [roomTeams, setRoomTeams] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const incomingTrades = useMemo(() => {
+    const myTeamId = team?.teamId || team?.team;
+    return (trades || []).filter(
+      (t) =>
+        t.status === 'pending' &&
+        ((user?.uid && t.receiverUserId === user.uid) || (myTeamId && t.receiverTeamId === myTeamId))
+    );
+  }, [trades, team, user?.uid]);
+
+  const outgoingTrades = useMemo(() => {
+    const myTeamId = team?.teamId || team?.team;
+    return (trades || []).filter(
+      (t) =>
+        t.status === 'pending' &&
+        ((user?.uid && t.senderUserId === user.uid) || (myTeamId && t.senderTeamId === myTeamId))
+    );
+  }, [trades, team, user?.uid]);
   const [soloLockStatus, setSoloLockStatus] = useState('active'); // 'active' | 'blocked' | 'taken_over'
   const isSoloLockHeldRef = React.useRef(false);
   const soloBotLoopRef = React.useRef(null);
@@ -570,6 +589,58 @@ export const AuctionProvider = ({ children }) => {
         }
       } else if (!Array.isArray(roomData.playerOrder) || roomData.playerOrder.length === 0) {
         await updateRtdb(rtdbRoomRef, { playerOrder });
+      }
+
+      if (disposition === 'start') {
+        // Ensure all remaining franchise slots are populated with bot teams & official retentions
+        try {
+          const budget = toFiniteNumber(roomData.settings?.budget, 150.0);
+          const isMega = (roomData.auctionType || 'mega') === 'mega';
+          const takenIds = new Set(mapRoomPlayers(roomData.players, (p) => p.team).filter(Boolean));
+          const botsToAdd = TEAMS.filter((t) => !takenIds.has(t.id));
+
+          if (botsToAdd.length > 0) {
+            await runTransactionRtdb(ref(rtdb, `auctions/${roomId}/room/players`), (currentPlayers) => {
+              const players = mapRoomPlayers(currentPlayers, (p) => p);
+              const currentTaken = new Set(players.map((p) => p.team).filter(Boolean));
+              const newBots = TEAMS.filter((t) => !currentTaken.has(t.id)).map((t) => {
+                const botInit = isMega ? getTeamInitialState(t.id, budget) : { spent: 0, squadCount: 0 };
+                return {
+                  id: `bot_${t.id}`,
+                  name: t.botName || `${t.name} Bot`,
+                  team: t.id,
+                  teamName: t.name,
+                  isHost: false,
+                  isBot: true,
+                  spent: botInit.spent,
+                  squadCount: botInit.squadCount,
+                };
+              });
+              return newBots.length > 0 ? [...players, ...newBots] : players;
+            });
+
+            await Promise.all(
+              botsToAdd.map((t) => {
+                const botState = isMega ? getTeamInitialState(t.id, budget) : { budgetRemaining: budget, spent: 0, squad: [], rtmCards: 0 };
+                return runTransactionRtdb(
+                  ref(rtdb, `auctions/${roomId}/teams/${roomId}_bot_${t.id}`),
+                  (current) => current ?? {
+                    auctionId: roomId,
+                    userId: `bot_${t.id}`,
+                    teamId: t.id,
+                    teamName: t.name,
+                    budgetRemaining: botState.budgetRemaining,
+                    spent: botState.spent,
+                    squad: botState.squad,
+                    rtmCards: botState.rtmCards,
+                  }
+                );
+              })
+            );
+          }
+        } catch (botInitErr) {
+          console.warn('[auction] Best effort bot team initialization notice:', botInitErr);
+        }
       }
 
       // Check if room is 1 human vs AI bots
@@ -1488,6 +1559,12 @@ export const AuctionProvider = ({ children }) => {
 
     // Create/Update team in RTDB if team is provided
     if (playerDetails.team) {
+      const isMega = (data.auctionType || 'mega') === 'mega';
+      const budget = toFiniteNumber(data.settings?.budget, 150.0);
+      const teamInit = isMega
+        ? getCustomTeamRetainedState(playerDetails.team, null, budget)
+        : { squad: [], squadCount: 0, spent: 0, budgetRemaining: budget, rtmCards: 0 };
+
       const rtdbTeamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`));
       if (!rtdbTeamSnap.exists()) {
         const teamDataToSet = {
@@ -1495,9 +1572,10 @@ export const AuctionProvider = ({ children }) => {
           userId: userId,
           teamId: playerDetails.team,
           teamName: teamDetails?.name || 'Unknown',
-          budgetRemaining: toFiniteNumber(data.settings?.budget, 120.0),
-          spent: 0,
-          squad: []
+          budgetRemaining: teamInit.budgetRemaining,
+          spent: teamInit.spent,
+          squad: teamInit.squad,
+          rtmCards: teamInit.rtmCards,
         };
         await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), teamDataToSet);
       } else {
@@ -1505,7 +1583,11 @@ export const AuctionProvider = ({ children }) => {
         if (tData.teamId !== playerDetails.team) {
           await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), {
             teamId: playerDetails.team,
-            teamName: teamDetails?.name || 'Unknown'
+            teamName: teamDetails?.name || 'Unknown',
+            budgetRemaining: teamInit.budgetRemaining,
+            spent: teamInit.spent,
+            squad: teamInit.squad,
+            rtmCards: teamInit.rtmCards,
           });
         }
       }
@@ -1605,6 +1687,7 @@ export const AuctionProvider = ({ children }) => {
     const teamsList = saved.roomTeams || saved.teams || [];
     setRoomTeams(teamsList);
     setMessages(saved.messages || []);
+    setTrades(saved.trades || []);
     const humanTeam = teamsList.find(
       (t) => t.userId === userId || t.userId === user?.uid || !String(t.userId).startsWith('bot_'),
     );
@@ -1639,6 +1722,7 @@ export const AuctionProvider = ({ children }) => {
         const updatedTeamsList = next.roomTeams || next.teams || [];
         setRoomTeams(updatedTeamsList);
         setMessages(next.messages || []);
+        setTrades(next.trades || []);
         const nextHumanTeam = updatedTeamsList.find(
           (t) => t.userId === userId || t.userId === user?.uid || !String(t.userId).startsWith('bot_'),
         );
@@ -2226,6 +2310,22 @@ export const AuctionProvider = ({ children }) => {
       handleFirebaseError(error);
     });
 
+    const tradesRef = ref(roomRtdb, `auctions/${auctionId}/trades`);
+    const unsubTrades = onValue(tradesRef, (snapshot) => {
+      if (!alive) return;
+      if (snapshot.exists()) {
+        const tradeList = [];
+        snapshot.forEach((child) => {
+          tradeList.push({ id: child.key, ...child.val() });
+        });
+        setTrades(tradeList);
+      } else {
+        setTrades([]);
+      }
+    }, (error) => {
+      handleFirebaseError(error);
+    });
+
     return () => {
       // Stop delayed fallbacks/presence work belonging to this closed room.
       alive = false;
@@ -2251,6 +2351,7 @@ export const AuctionProvider = ({ children }) => {
       unsubTeamChanged();
       unsubTeamRemoved();
       unsubMessages();
+      unsubTrades();
       // Set offline on component unmount
       set(myPresenceRef, { online: false, lastSeen: serverTimestampRtdb() });
 
@@ -2271,6 +2372,7 @@ export const AuctionProvider = ({ children }) => {
       setTeam(null);
       setRoomTeams([]);
       setMessages([]);
+      setTrades([]);
 
       // Allow in-flight writes and transactions to settle cleanly before closing
       // the socket, but never close it while another room on this server is open.
@@ -2615,6 +2717,12 @@ export const AuctionProvider = ({ children }) => {
     const botUserId = `bot_${teamId}`;
     const botName = teamDetails.botName || `${teamDetails.name} Bot`;
 
+    const isMega = (data.auctionType || 'mega') === 'mega';
+    const budget = toFiniteNumber(data.settings?.budget, 150.0);
+    const botInit = isMega
+      ? getTeamInitialState(teamId, budget)
+      : { spent: 0, squadCount: 0, squad: [], budgetRemaining: budget, rtmCards: 0 };
+
     const playersTx = await runTransactionRtdb(
       ref(rtdb, `auctions/${roomId}/room/players`),
       (currentPlayers) => {
@@ -2627,6 +2735,8 @@ export const AuctionProvider = ({ children }) => {
           teamName: teamDetails.name,
           isHost: false,
           isBot: true,
+          spent: botInit.spent,
+          squadCount: botInit.squadCount,
         }];
       },
     );
@@ -2637,9 +2747,10 @@ export const AuctionProvider = ({ children }) => {
       userId: botUserId,
       teamId,
       teamName: teamDetails.name,
-      budgetRemaining: toFiniteNumber(data.settings?.budget, 120.0),
-      spent: 0,
-      squad: []
+      budgetRemaining: botInit.budgetRemaining,
+      spent: botInit.spent,
+      squad: botInit.squad,
+      rtmCards: botInit.rtmCards,
     };
     await runTransactionRtdb(
       ref(rtdb, `auctions/${roomId}/teams/${roomId}_${botUserId}`),
@@ -2963,14 +3074,31 @@ export const AuctionProvider = ({ children }) => {
           cashFromB: cashRequested,
           now: Date.now(),
         });
-        return { success: true };
+        return { success: true, message: 'Trade executed successfully.' };
       }
     }
 
     const partnerTeamDoc = roomTeams.find(t => t.teamId === partnerTeamId);
-    const myTeamDoc = team;
+    const myTeamDoc = team || roomTeams.find(t => t.userId === user?.uid);
     if (!partnerTeamDoc || !myTeamDoc) return { success: false, reason: 'Team not found' };
 
+    const val = validatePlayerTrade({
+      teamA: myTeamDoc,
+      teamB: partnerTeamDoc,
+      playerA: playerOffered,
+      playerB: playerRequested,
+      cashFromA: cashOffered,
+      cashFromB: cashRequested,
+      squadLimit: currentAuction?.squadLimit || 25,
+      overseasLimit: currentAuction?.overseasLimit || 8,
+    });
+    if (!val.isValid) {
+      return { success: false, reason: val.reason };
+    }
+
+    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+
+    // AI Bot trade: evaluate and execute immediately
     if (partnerTeamDoc.userId && String(partnerTeamDoc.userId).startsWith('bot_')) {
       const decision = evaluateBotTrade({
         botTeam: partnerTeamDoc,
@@ -2986,7 +3114,6 @@ export const AuctionProvider = ({ children }) => {
         return { success: false, reason: decision.message };
       }
 
-      const rtdbInstance = getRtdbInstance(currentAuction?.server);
       const myRef = ref(rtdbInstance, `auctions/${roomId}/teams/${roomId}_${myTeamDoc.userId}`);
       const partnerRef = ref(rtdbInstance, `auctions/${roomId}/teams/${roomId}_${partnerTeamDoc.userId}`);
 
@@ -3015,8 +3142,163 @@ export const AuctionProvider = ({ children }) => {
       return { success: true, message: decision.message };
     }
 
-    return { success: true, message: 'Trade proposal submitted successfully.' };
-  }, [currentAuction, team, roomTeams]);
+    // Human player trade: submit pending proposal to RTDB
+    const tradeId = `trade_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const tradeRef = ref(rtdbInstance, `auctions/${roomId}/trades/${tradeId}`);
+
+    const tradeData = {
+      id: tradeId,
+      roomId,
+      senderUserId: user?.uid || myTeamDoc.userId,
+      senderTeamId: myTeamDoc.teamId,
+      senderTeamName: myTeamDoc.teamName,
+      senderName: user?.displayName || myTeamDoc.teamName || 'Manager',
+      receiverUserId: partnerTeamDoc.userId,
+      receiverTeamId: partnerTeamDoc.teamId,
+      receiverTeamName: partnerTeamDoc.teamName,
+      playerOffered: playerOffered ? {
+        id: playerOffered.id,
+        name: playerOffered.name,
+        role: playerOffered.role,
+        image: playerOffered.image,
+        cost: playerOffered.soldPrice ?? playerOffered.retentionCost ?? playerOffered.cost ?? 0,
+        soldPrice: playerOffered.soldPrice ?? playerOffered.retentionCost ?? playerOffered.cost ?? 0,
+        isOverseas: isOverseasPlayer(playerOffered),
+      } : null,
+      playerRequested: playerRequested ? {
+        id: playerRequested.id,
+        name: playerRequested.name,
+        role: playerRequested.role,
+        image: playerRequested.image,
+        cost: playerRequested.soldPrice ?? playerRequested.retentionCost ?? playerRequested.cost ?? 0,
+        soldPrice: playerRequested.soldPrice ?? playerRequested.retentionCost ?? playerRequested.cost ?? 0,
+        isOverseas: isOverseasPlayer(playerRequested),
+      } : null,
+      cashOffered: Number(cashOffered || 0),
+      cashRequested: Number(cashRequested || 0),
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+
+    await set(tradeRef, tradeData);
+
+    const tradeDesc = `${playerOffered ? playerOffered.name : '₹' + cashOffered + ' Cr'} for ${playerRequested ? playerRequested.name : '₹' + cashRequested + ' Cr'}`;
+    await push(ref(rtdbInstance, `auctions/${roomId}/messages`), {
+      text: `📋 TRADE OFFER: ${myTeamDoc.teamName} offered a trade (${tradeDesc}) to ${partnerTeamDoc.teamName}!`,
+      type: 'trade_alert',
+      sender: 'Trade System',
+      team: myTeamDoc.teamId,
+      timestamp: Date.now(),
+    });
+
+    return {
+      success: true,
+      message: `Trade proposal submitted to ${partnerTeamDoc.teamName}! The manager will be prompted to accept or decline.`,
+    };
+  }, [currentAuction, team, roomTeams, user]);
+
+  const respondToTrade = useCallback(async (tradeId, action) => {
+    if (!currentAuction?.id || !tradeId) return { success: false, reason: 'Invalid parameters' };
+    const roomId = currentAuction.id;
+    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const tradeRef = ref(rtdbInstance, `auctions/${roomId}/trades/${tradeId}`);
+
+    const tradeSnap = await get(tradeRef);
+    if (!tradeSnap.exists()) return { success: false, reason: 'Trade not found' };
+    const trade = tradeSnap.val();
+
+    if (trade.status !== 'pending') {
+      return { success: false, reason: `Trade is already ${trade.status}` };
+    }
+
+    if (action === 'decline') {
+      await updateRtdb(tradeRef, { status: 'declined', respondedAt: Date.now() });
+      await push(ref(rtdbInstance, `auctions/${roomId}/messages`), {
+        text: `❌ TRADE DECLINED: ${trade.receiverTeamName} declined the trade offer from ${trade.senderTeamName}.`,
+        type: 'trade_alert',
+        sender: 'Trade System',
+        team: trade.receiverTeamId,
+        timestamp: Date.now(),
+      });
+      return { success: true, message: 'Trade offer declined.' };
+    }
+
+    if (action === 'accept') {
+      const senderRef = ref(rtdbInstance, `auctions/${roomId}/teams/${roomId}_${trade.senderUserId}`);
+      const receiverRef = ref(rtdbInstance, `auctions/${roomId}/teams/${roomId}_${trade.receiverUserId}`);
+
+      const [senderSnap, receiverSnap] = await Promise.all([get(senderRef), get(receiverRef)]);
+      if (!senderSnap.exists() || !receiverSnap.exists()) {
+        return { success: false, reason: 'One of the franchises was not found' };
+      }
+
+      const senderTeam = senderSnap.val();
+      const receiverTeam = receiverSnap.val();
+
+      const val = validatePlayerTrade({
+        teamA: senderTeam,
+        teamB: receiverTeam,
+        playerA: trade.playerOffered,
+        playerB: trade.playerRequested,
+        cashFromA: trade.cashOffered,
+        cashFromB: trade.cashRequested,
+        squadLimit: currentAuction?.squadLimit || 25,
+        overseasLimit: currentAuction?.overseasLimit || 8,
+      });
+
+      if (!val.isValid) {
+        return { success: false, reason: `Cannot complete trade: ${val.reason}` };
+      }
+
+      const { teamA: updatedSender, teamB: updatedReceiver } = executePlayerTradeInSquads({
+        teamA: senderTeam,
+        teamB: receiverTeam,
+        playerA: trade.playerOffered,
+        playerB: trade.playerRequested,
+        cashFromA: trade.cashOffered,
+        cashFromB: trade.cashRequested,
+      });
+
+      await Promise.all([
+        set(senderRef, updatedSender),
+        set(receiverRef, updatedReceiver),
+        updateRtdb(tradeRef, { status: 'accepted', respondedAt: Date.now() }),
+      ]);
+
+      await runTransactionRtdb(ref(rtdbInstance, `auctions/${roomId}/room/players`), (currentPlayers) => {
+        return mapRoomPlayers(currentPlayers, (p) => {
+          if (p.id === trade.senderUserId) {
+            return { ...p, spent: updatedSender.spent, squadCount: updatedSender.squadCount };
+          }
+          if (p.id === trade.receiverUserId) {
+            return { ...p, spent: updatedReceiver.spent, squadCount: updatedReceiver.squadCount };
+          }
+          return p;
+        });
+      });
+
+      const tradeDetails = `${trade.playerOffered ? trade.playerOffered.name : '₹' + trade.cashOffered + ' Cr'} ⇄ ${trade.playerRequested ? trade.playerRequested.name : '₹' + trade.cashRequested + ' Cr'}`;
+      await push(ref(rtdbInstance, `auctions/${roomId}/messages`), {
+        text: `🚨 MEGA TRADE COMPLETED: ${trade.senderTeamName} and ${trade.receiverTeamName} successfully traded ${tradeDetails}!`,
+        type: 'trade_alert',
+        sender: 'Trade System',
+        team: trade.receiverTeamId,
+        timestamp: Date.now(),
+      });
+
+      return { success: true, message: 'Trade accepted! Squads and purses updated.' };
+    }
+
+    return { success: false, reason: 'Unknown action' };
+  }, [currentAuction]);
+
+  const cancelTrade = useCallback(async (tradeId) => {
+    if (!currentAuction?.id || !tradeId) return;
+    const roomId = currentAuction.id;
+    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const tradeRef = ref(rtdbInstance, `auctions/${roomId}/trades/${tradeId}`);
+    await updateRtdb(tradeRef, { status: 'cancelled', cancelledAt: Date.now() });
+  }, [currentAuction]);
 
   const value = {
     currentAuction,
@@ -3050,6 +3332,11 @@ export const AuctionProvider = ({ children }) => {
     exerciseRTM,
     passRTM,
     executeTrade,
+    respondToTrade,
+    cancelTrade,
+    trades,
+    incomingTrades,
+    outgoingTrades,
   };
 
   return (

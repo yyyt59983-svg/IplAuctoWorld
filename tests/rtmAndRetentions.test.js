@@ -21,6 +21,7 @@ import {
 } from '../src/lib/auctionRules.js';
 import { evaluateBotRTM, evaluateBotTrade } from '../src/lib/botEngine.js';
 import { localAuctionReducer } from '../src/lib/localAuctionEngine.js';
+import { transactTeamSale } from '../src/lib/auctionTransactions.js';
 import { IPL_PLAYERS } from '../src/data/players.js';
 import { TEAMS } from '../src/data/teams.js';
 
@@ -297,4 +298,99 @@ test('Solo Auction Engine: initializes with custom user retentions and accurate 
   assert.equal(cskBot.spent, 65.0);
   assert.equal(cskBot.budgetRemaining, 85.0);
   assert.equal(cskBot.rtmCards, 1);
+});
+
+test('transactTeamSale: preserves retention costs and does not reset purse to 150 Cr', () => {
+  // Start with MI official retentions (75 Cr spent, 75 Cr remaining)
+  const miInitial = getTeamInitialState('MI', 150.0);
+  assert.equal(miInitial.spent, 75.0);
+  assert.equal(miInitial.budgetRemaining, 75.0);
+
+  const miTeamNode = {
+    auctionId: 'TEST_ROOM',
+    userId: 'user_mi',
+    teamId: 'MI',
+    teamName: 'Mumbai Indians',
+    squad: miInitial.squad,
+    spent: miInitial.spent,
+    budgetRemaining: miInitial.budgetRemaining,
+    rtmCards: miInitial.rtmCards,
+  };
+
+  // Now MI wins a new player in the auction for 10 Cr
+  const updatedTeam = transactTeamSale(miTeamNode, {
+    roomId: 'TEST_ROOM',
+    playerId: 'p_new_star',
+    bid: 10.0,
+    winnerId: 'user_mi',
+    winnerTeamId: 'MI',
+    winnerName: 'Mumbai Indians',
+    initialBudget: 150.0,
+  });
+
+  // Total spent must now be 75 + 10 = 85 Cr, and remaining purse must be 150 - 85 = 65 Cr!
+  assert.equal(updatedTeam.squad.length, miInitial.squad.length + 1);
+  assert.equal(updatedTeam.spent, 85.0);
+  assert.equal(updatedTeam.budgetRemaining, 65.0);
+});
+
+test('Human-to-Human Trade: validates, swaps players, and adjusts cash consideration', () => {
+  const cskInitial = getTeamInitialState('CSK', 150.0);
+  const miInitial = getTeamInitialState('MI', 150.0);
+
+  const teamA = {
+    userId: 'user_csk',
+    teamId: 'CSK',
+    teamName: 'Chennai Super Kings',
+    squad: cskInitial.squad,
+    spent: cskInitial.spent, // 65 Cr
+    budgetRemaining: cskInitial.budgetRemaining, // 85 Cr
+  };
+
+  const teamB = {
+    userId: 'user_mi',
+    teamId: 'MI',
+    teamName: 'Mumbai Indians',
+    squad: miInitial.squad,
+    spent: miInitial.spent, // 75 Cr
+    budgetRemaining: miInitial.budgetRemaining, // 75 Cr
+  };
+
+  const playerA = teamA.squad[0]; // e.g. Ruturaj Gaikwad
+  const playerB = teamB.squad[0]; // e.g. Jasprit Bumrah
+
+  const val = validatePlayerTrade({
+    teamA,
+    teamB,
+    playerA,
+    playerB,
+    cashFromA: 2.0,
+    cashFromB: 0,
+    squadLimit: 25,
+    overseasLimit: 8,
+  });
+  assert.equal(val.isValid, true);
+
+  const { teamA: updatedA, teamB: updatedB } = executePlayerTradeInSquads({
+    teamA,
+    teamB,
+    playerA,
+    playerB,
+    cashFromA: 2.0,
+    cashFromB: 0,
+  });
+
+  // Team A gave 2.0 Cr cash to Team B:
+  // Team A budget remaining: 85 - 2 = 83 Cr
+  // Team B budget remaining: 75 + 2 = 77 Cr
+  assert.equal(updatedA.budgetRemaining, 83.0);
+  assert.equal(updatedA.spent, 67.0);
+  assert.equal(updatedB.budgetRemaining, 77.0);
+  assert.equal(updatedB.spent, 73.0);
+
+  // Check players were swapped
+  assert.ok(updatedA.squad.some((p) => p.id === playerB.id));
+  assert.ok(!updatedA.squad.some((p) => p.id === playerA.id));
+  assert.ok(updatedB.squad.some((p) => p.id === playerA.id));
+  assert.ok(!updatedB.squad.some((p) => p.id === playerB.id));
 });

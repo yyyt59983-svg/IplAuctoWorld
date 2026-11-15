@@ -41,6 +41,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import AuctionCountdown from '../components/AuctionCountdown';
 import RTMCardModal from '../components/RTMCardModal';
 import TradeCenterModal from '../components/TradeCenterModal';
+import IncomingTradeModal from '../components/IncomingTradeModal';
+import { getTeamInitialState } from '../data/retentions';
 import AdSlot, { DEFAULT_AUCTION_ROOM_SLOT } from '../components/AdSlot';
 import useRoomServer from '../hooks/useRoomServer';
 import { SERVER_LOCAL, withServerParam } from '../lib/auctionServers';
@@ -86,9 +88,26 @@ const AuctionRoom = () => {
       exerciseRTM,
       passRTM,
       executeTrade,
+      respondToTrade,
+      cancelTrade,
+      trades,
+      incomingTrades,
+      outgoingTrades,
    } = useAuction();
    const { user } = useAuth();
    const [isTradeCenterOpen, setIsTradeCenterOpen] = useState(false);
+   const [isIncomingTradeDismissed, setIsIncomingTradeDismissed] = useState(false);
+   const lastTradeIdRef = useRef(null);
+
+   useEffect(() => {
+      if (incomingTrades && incomingTrades.length > 0) {
+         const newestId = incomingTrades[0].id;
+         if (newestId !== lastTradeIdRef.current) {
+            lastTradeIdRef.current = newestId;
+            setIsIncomingTradeDismissed(false);
+         }
+      }
+   }, [incomingTrades]);
    const [error, setError] = useState('');
    const [copied, setCopied] = useState(false);
    const [showPlayersOverlay, setShowPlayersOverlay] = useState(false);
@@ -145,17 +164,26 @@ const AuctionRoom = () => {
       return server === SERVER_LOCAL || isLocalRoom(id, server);
    }, [server, id]);
 
-   // Effective team: use context team, or in solo rooms derive the human team from roomTeams/currentAuction
+   const currentUserPlayer = useMemo(() => {
+      return (currentAuction?.players || []).find(p => p.id === user?.uid);
+   }, [currentAuction?.players, user?.uid]);
+
+   // Effective team: use context team, or derive from roomTeams/currentUserPlayer
    const team = useMemo(() => {
-      const t = contextTeam || (isSoloVsBots ? (roomTeams || []).find(doc => doc.userId === user?.uid || !String(doc.userId).startsWith('bot_')) : null);
-      if (!t) return null;
+      const myTeamDoc = (roomTeams || []).find(doc => doc.userId === user?.uid || (currentUserPlayer?.team && doc.teamId === currentUserPlayer.team))
+         || contextTeam
+         || (isSoloVsBots ? (roomTeams || []).find(doc => !String(doc.userId).startsWith('bot_')) : null);
+      if (!myTeamDoc) return null;
+      const totalBudget = toFiniteNumber(currentAuction?.settings?.budget, 150.0);
+      const budgetRemaining = myTeamDoc.budgetRemaining ?? Math.max(0, totalBudget - (myTeamDoc.spent || 0));
       return {
-         ...t,
-         id: t.teamId || t.id,
-         teamId: t.teamId || t.id,
-         team: t.teamId || t.id,
+         ...myTeamDoc,
+         id: myTeamDoc.teamId || myTeamDoc.id,
+         teamId: myTeamDoc.teamId || myTeamDoc.id,
+         team: myTeamDoc.teamId || myTeamDoc.id,
+         budgetRemaining,
       };
-   }, [contextTeam, isSoloVsBots, roomTeams, user?.uid]);
+   }, [contextTeam, isSoloVsBots, roomTeams, user?.uid, currentUserPlayer?.team, currentAuction?.settings?.budget]);
 
    const [isSkippingLot, setIsSkippingLot] = useState(false);
    const [isFastForwarding, setIsFastForwarding] = useState(false);
@@ -1144,6 +1172,11 @@ const AuctionRoom = () => {
                >
                   <ArrowLeftRight size={13} className="text-cyan-400" />
                   <span className="inline font-bold">⇄ Trade Center</span>
+                  {incomingTrades?.length > 0 && (
+                     <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-slate-950 animate-bounce">
+                        {incomingTrades.length}
+                     </span>
+                  )}
                </button>
 
                {/* Solo vs AI Bots Fast Forward / Finish Button */}
@@ -1274,7 +1307,7 @@ const AuctionRoom = () => {
                               <div className="flex items-center gap-4">
                                  <div className="text-right">
                                     <span className="text-[10px] compact:text-[9px] font-bold block leading-none text-gray-200">
-                                       ₹{formatCrores(teamDoc?.budgetRemaining ?? toFiniteNumber(currentAuction?.settings?.budget, 150))} Cr
+                                       ₹{formatCrores(teamDoc?.budgetRemaining ?? (teamDoc?.spent != null ? Math.max(0, toFiniteNumber(currentAuction?.settings?.budget, 150) - teamDoc.spent) : getTeamInitialState(t.id, toFiniteNumber(currentAuction?.settings?.budget, 150)).budgetRemaining))} Cr
                                     </span>
                                     <span className="text-[8px] compact:text-[7px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{toFiniteNumber(currentAuction?.squadLimit, 25)}</span>
                                     {teamDoc?.rtmCards > 0 && (
@@ -1300,7 +1333,7 @@ const AuctionRoom = () => {
                                        <div className="flex items-center justify-between text-[9px] compact:text-[8px] font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 pb-2">
                                           <span>Spent: <span className="text-slate-300 font-bold">{(() => {
                                              const spent = computeTeamSpent({
-                                                budget: toFiniteNumber(currentAuction?.settings?.budget, 120),
+                                                budget: toFiniteNumber(currentAuction?.settings?.budget, 150),
                                                 budgetRemaining: teamDoc?.budgetRemaining,
                                                 spent: teamDoc?.spent,
                                              });
@@ -1687,7 +1720,7 @@ const AuctionRoom = () => {
                                     {/* Franchise Quick Stats Bar right above Bid button (Mobile view only) */}
                                     {team && (() => {
                                        const osCount = countOverseas(team.squad, IPL_PLAYERS);
-                                       const totalBudget = toFiniteNumber(currentAuction?.settings?.budget, 120);
+                                       const totalBudget = toFiniteNumber(currentAuction?.settings?.budget, 150);
 
                                        return (
                                           <div className="flex md:hidden items-center justify-between bg-[#0e1015] border border-white/10 px-2.5 sm:px-4 py-2 rounded-xl text-[9px] sm:text-xs font-bold text-gray-300">
@@ -1703,7 +1736,7 @@ const AuctionRoom = () => {
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Purse Left out of Total Budget">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Purse:</span>
-                                                <span className="text-slate-200 font-extrabold">₹{formatCrores(team.budgetRemaining ?? totalBudget)}/{formatCrores(totalBudget, 0)}Cr</span>
+                                                <span className="text-slate-200 font-extrabold">₹{formatCrores(team.budgetRemaining ?? Math.max(0, totalBudget - (team.spent || 0)))}/{formatCrores(totalBudget, 0)}Cr</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10 hidden xs:block" />
                                              <div className="items-center gap-1 hidden xs:flex" title="Total Spent">
@@ -2404,52 +2437,6 @@ const AuctionRoom = () => {
             isOpen={
                (displayAuctionState?.status === 'rtm_pending' || currentAuction?.status === 'rtm_pending') &&
                (displayAuctionState?.rtmTeamId === (team?.teamId || team?.team || contextTeam?.teamId) ||
-                  currentAuction?.rtmTeamId === (team?.teamId || team?.team || contextTeam?.teamId))
-            }
-            player={currentPlayer}
-            currentBid={displayAuctionState?.currentBid || currentAuction?.currentBid}
-            highBidderName={displayAuctionState?.highBidderName || currentAuction?.highBidderName}
-            highBidderTeamId={displayAuctionState?.highBidderTeamId || currentAuction?.highBidderTeamId}
-            myTeam={team || contextTeam}
-            rtmCardsLeft={
-               roomTeams.find(t => t.teamId === (team?.teamId || team?.team || contextTeam?.teamId))?.rtmCards ?? 1
-            }
-            deadline={displayAuctionState?.rtmDeadline || currentAuction?.rtmDeadline}
-            onMatch={async () => {
-               try {
-                  await exerciseRTM(id);
-               } catch (err) {
-                  console.error('RTM match failed:', err);
-               }
-            }}
-            onPass={async () => {
-               try {
-                  await passRTM(id);
-               } catch (err) {
-                  console.error('RTM pass failed:', err);
-               }
-            }}
-         />
-
-         {/* IPL Transfer & Trade Center Modal */}
-         <TradeCenterModal
-            isOpen={isTradeCenterOpen}
-            onClose={() => setIsTradeCenterOpen(false)}
-            myTeam={team || contextTeam}
-            allTeams={roomTeams}
-            onExecuteTrade={async (tradeData) => {
-               return await executeTrade({
-                  roomId: id,
-                  ...tradeData,
-               });
-            }}
-         />
-
-         {/* Right To Match (RTM) Modal */}
-         <RTMCardModal
-            isOpen={
-               (displayAuctionState?.status === 'rtm_pending' || currentAuction?.status === 'rtm_pending') &&
-               (displayAuctionState?.rtmTeamId === (team?.teamId || team?.team || contextTeam?.teamId) ||
                 currentAuction?.rtmTeamId === (team?.teamId || team?.team || contextTeam?.teamId))
             }
             player={currentPlayer}
@@ -2483,94 +2470,35 @@ const AuctionRoom = () => {
             onClose={() => setIsTradeCenterOpen(false)}
             myTeam={team || contextTeam}
             allTeams={roomTeams}
+            incomingTrades={incomingTrades}
+            outgoingTrades={outgoingTrades}
             onExecuteTrade={async (tradeData) => {
                return await executeTrade({
                   roomId: id,
                   ...tradeData,
                });
             }}
+            onRespondToTrade={async (tradeId, action) => {
+               return await respondToTrade(tradeId, action);
+            }}
+            onCancelTrade={async (tradeId) => {
+               await cancelTrade(tradeId);
+            }}
          />
-      </div>
-   );
-};
 
-const SoldCard = ({ msg }) => {
-   const cardRef = useRef(null);
-   const player = IPL_PLAYERS.find(p => p.id === msg.metadata.playerId);
-   const team = TEAMS.find(t => t.id === msg.metadata.teamId);
-   const slogan = TEAM_SLOGANS[msg.metadata.teamId] || { slogan: 'IPL 2025!', hashtag: '#IPL' };
-
-   const handleSave = async () => {
-      if (cardRef.current === null) return;
-      try {
-         const dataUrl = await toPng(cardRef.current, {
-            cacheBust: false,
-            pixelRatio: 2,
-            skipFonts: true,
-            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
-         });
-         const link = document.createElement('a');
-         link.download = `${player.name}_Sold.png`;
-         link.href = dataUrl;
-         link.click();
-      } catch (err) {
-         console.error('Error saving image:', err);
-      }
-   };
-
-   return (
-      <div className="space-y-2 mb-4 sm:mb-6">
-         <div ref={cardRef} className="relative w-full min-h-[400px] max-h-[480px] h-auto aspect-[4/5] rounded-2xl sm:rounded-[2rem] overflow-hidden bg-[#0c0d10] border border-white/10 shadow-2xl">
-            <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${team?.color.replace('bg-', 'from-')} to-black`} />
-            <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:12px_12px] opacity-20" />
-
-            <div className="relative h-full flex flex-col p-4 sm:p-6 z-10 justify-between">
-               <div className="flex justify-between items-start mb-2 sm:mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 border border-white/10">
-                     <img src={team?.logo} alt={`${team?.name || 'Franchise'} Logo`} className="w-full h-full object-contain " />
-                  </div>
-                  <div className="text-right uppercase tracking-[0.15em] sm:tracking-[0.2em]">
-                     <p className="text-[7px] sm:text-[8px] font-pixel text-slate-400 mb-0.5">IPL Auction</p>
-                     <p className="text-[9px] sm:text-[10px] font-bold text-white/50 leading-none">Sold to</p>
-                     <p className="text-[11px] sm:text-[12px] font-black text-white">{msg.metadata.buyerName}</p>
-                  </div>
-               </div>
-
-               <div className="flex-1 flex flex-col justify-center items-center py-2 sm:py-4">
-                  <div className="relative w-28 h-28 sm:w-40 sm:h-40 group">
-                     <div className={`absolute inset-0 rounded-full blur-3xl opacity-30 ${team?.color}`} />
-                     <img
-                        src={player?.image}
-                        className="relative w-full h-full object-contain z-10 drop-shadow-[0_0_20px_rgba(0,0,0,0.5)]"
-                        alt={player?.name || 'Sold Player'}
-                        onError={(e) => {
-                           e.target.onerror = null;
-                           e.target.src = getPlayerAvatar(player?.name);
-                        }}
-                     />
-                  </div>
-                  <div className="text-center mt-2 sm:mt-4">
-                     <h2 className="text-xl sm:text-2xl compact:text-xl font-black uppercase tracking-tight text-white leading-tight">{player?.name}</h2>
-                     <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] sm:tracking-[0.3em]">{player?.role} • {player?.country}</p>
-                  </div>
-               </div>
-
-               <div className="space-y-3 sm:space-y-4">
-                  <div className="text-center">
-                     <p className="text-sm sm:text-[16px] font-pixel italic uppercase tracking-wider text-slate-300 drop-shadow-lg">#{slogan.slogan}</p>
-
-                  </div>
-
-                  <div className="bg-white/5 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl text-center">
-
-                     <p className="text-xl sm:text-2xl compact:text-xl font-black text-white">₹{formatCrores(msg.metadata?.bid)} Cr</p>
-                  </div>
-               </div>
-            </div>
-         </div>
-         <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 hover:border-white/10 text-gray-400 hover:text-white">
-            <Download size={14} /> Save Player Card
-         </button>
+         {/* Incoming Trade Proposal Alert Modal */}
+         <IncomingTradeModal
+            isOpen={incomingTrades?.length > 0 && !isIncomingTradeDismissed}
+            incomingTrades={incomingTrades}
+            myTeam={team || contextTeam}
+            onAccept={async (tradeId) => {
+               return await respondToTrade(tradeId, 'accept');
+            }}
+            onDecline={async (tradeId) => {
+               return await respondToTrade(tradeId, 'decline');
+            }}
+            onClose={() => setIsIncomingTradeDismissed(true)}
+         />
       </div>
    );
 };

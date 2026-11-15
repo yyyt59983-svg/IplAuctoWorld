@@ -60,8 +60,9 @@ export function transactTeamSale(currentTeam, {
   winnerId,
   winnerTeamId,
   winnerName,
-  initialBudget = 120,
+  initialBudget = 150,
 }) {
+  const effectiveBudget = toFiniteNumber(initialBudget, 150);
   const baseTeam = currentTeam || {
     auctionId: roomId,
     userId: winnerId,
@@ -69,7 +70,7 @@ export function transactTeamSale(currentTeam, {
     teamName: winnerName || 'Unknown',
     squad: [],
     spent: 0,
-    budgetRemaining: toFiniteNumber(initialBudget, 120),
+    budgetRemaining: effectiveBudget,
   };
 
   const currentSquad = normalizeSquad(baseTeam.squad);
@@ -84,9 +85,15 @@ export function transactTeamSale(currentTeam, {
     return currentTeam;
   }
 
-  const squad = [...currentSquad, { id: playerId, bid: toFiniteNumber(bid, 0) }];
+  const squad = [...currentSquad, { id: playerId, bid: toFiniteNumber(bid, 0), soldPrice: toFiniteNumber(bid, 0) }];
   const spent = squad.reduce(
-    (sum, entry) => r2(sum + toFiniteNumber(typeof entry === 'object' ? entry.bid : 0, 0)),
+    (sum, entry) => {
+      if (typeof entry === 'object' && entry !== null) {
+        const costVal = entry.bid ?? entry.retentionCost ?? entry.soldPrice ?? entry.cost;
+        return r2(sum + toFiniteNumber(costVal, 0));
+      }
+      return sum;
+    },
     0,
   );
 
@@ -94,7 +101,7 @@ export function transactTeamSale(currentTeam, {
     ...baseTeam,
     teamId: winnerTeamId || baseTeam.teamId || '',
     teamName: winnerName || baseTeam.teamName || 'Unknown',
-    budgetRemaining: Math.max(0, r2(toFiniteNumber(initialBudget, 120) - spent)),
+    budgetRemaining: Math.max(0, r2(effectiveBudget - spent)),
     spent,
     squad,
   };
