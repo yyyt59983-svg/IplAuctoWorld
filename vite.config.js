@@ -15,6 +15,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('src/data/players') || id.includes('src\\data\\players')) {
+            return 'players-data';
+          }
           if (id.includes('node_modules')) {
             if (id.includes('firebase')) {
               return 'firebase-vendor';

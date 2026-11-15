@@ -32,7 +32,7 @@
     <!-- Google AdSense: enables Auto ads site-wide as soon as the site is approved.
          The publisher ID is public (also in ads.txt), so it is safe to inline. -->
     <script
-      async
+      defer
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2952599241278941"
       crossorigin="anonymous"
     ></script>
@@ -63,6 +63,9 @@
     </script>
 
     <title>IplAuctoWorld - Multiplayer T20 Auction Simulator | By Yashwanth N & Vishal Pujari</title>
+    <!-- Preload developer hero images for instant above-the-fold paint -->
+    <link rel="preload" as="image" href="/developers/yashwanth.jpg" fetchpriority="high" />
+    <link rel="preload" as="image" href="/developers/vishal.jpg" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Geist+Pixel&display=swap" rel="stylesheet">

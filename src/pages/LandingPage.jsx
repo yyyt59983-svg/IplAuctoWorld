@@ -137,6 +137,102 @@ const mergeHistorySessions = (localSessions, remoteSessions) => {
   ];
 };
 
+/** Hero developer badge & welcome section */
+const DeveloperHero = () => (
+  <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 z-10 relative mb-3 sm:mb-4 mt-1 sm:mt-2">
+    <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-6 md:gap-10">
+      {/* Left Developer: Yashwanth N */}
+      <div className="flex flex-col items-center flex-shrink-0 group">
+        <div className="relative p-0.5 sm:p-1 rounded-2xl bg-gradient-to-b from-white/20 via-white/5 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.06)] ring-1 ring-white/15">
+          <img
+            src="/developers/yashwanth.jpg"
+            alt="Yashwanth N - Developer"
+            className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover object-top rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105"
+            loading="eager"
+            width="96"
+            height="96"
+          />
+          <div
+            className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500 rounded-full border-2 border-[#0a0a0c]"
+            title="Active Developer"
+          />
+        </div>
+        <span className="mt-1.5 text-[9px] sm:text-[11px] font-pixel text-slate-200 tracking-wide text-center font-semibold max-w-[70px] sm:max-w-none truncate sm:overflow-visible">
+          Yashwanth N
+        </span>
+        <span className="text-[7.5px] sm:text-[9px] font-mono text-emerald-400/90 tracking-tight text-center uppercase">
+          Developer
+        </span>
+      </div>
+
+      {/* Center: Welcome Text */}
+      <div className="text-center flex-1 max-w-md sm:max-w-lg min-w-0">
+        <h1 className="sr-only">
+          IplAuctoWorld - Fan-Made Multiplayer T20 Cricket Auction Simulator
+        </h1>
+
+        <div className="text-[clamp(1.1rem,2.8vw,2.35rem)] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white via-white/90 to-white/60">
+          CREATE YOUR
+        </div>
+        <div className="text-[clamp(1.7rem,5.4vw,3.85rem)] font-pixel leading-none uppercase text-balance mt-0.5 sm:mt-1 drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
+          AUCTION ROOM
+        </div>
+
+        <p className="text-xs sm:text-[13px] text-slate-400 font-pixel max-w-lg mx-auto mt-2 leading-relaxed px-1 hidden xs:block">
+          The ultimate multiplayer IPL auction simulator and game. Host live IPL
+          mega auctions with friends in real-time, choose your favorite
+          franchise, bid strategically, and build a championship T20 squad.
+        </p>
+
+        {/* Micro Step Indicators */}
+        <div className="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 mt-2.5 sm:mt-3 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-[8px] sm:text-[9.5px] font-black tracking-wider sm:tracking-widest text-slate-400 uppercase select-none">
+          <span className="hover:text-slate-200 transition-colors">
+            ① Create Room
+          </span>
+          <span className="text-white/20">➔</span>
+          <span className="hover:text-slate-200 transition-colors">
+            ② Invite Friends
+          </span>
+          <span className="text-white/20">➔</span>
+          <span className="hover:text-slate-200 transition-colors">
+            ③ Start Bidding
+          </span>
+        </div>
+      </div>
+
+      {/* Right Developer: Vishal Pujari */}
+      <div className="flex flex-col items-center flex-shrink-0 group">
+        <div className="relative p-0.5 sm:p-1 rounded-2xl bg-gradient-to-b from-white/20 via-white/5 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.06)] ring-1 ring-white/15">
+          <img
+            src="/developers/vishal.jpg"
+            alt="Vishal Pujari - Developer"
+            className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover object-top rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105"
+            loading="eager"
+            width="96"
+            height="96"
+          />
+          <div
+            className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500 rounded-full border-2 border-[#0a0a0c]"
+            title="Active Developer"
+          />
+        </div>
+        <span className="mt-1.5 text-[9px] sm:text-[11px] font-pixel text-slate-200 tracking-wide text-center font-semibold max-w-[70px] sm:max-w-none truncate sm:overflow-visible">
+          Vishal Pujari
+        </span>
+        <span className="text-[7.5px] sm:text-[9px] font-mono text-emerald-400/90 tracking-tight text-center uppercase">
+          Developer
+        </span>
+      </div>
+    </div>
+
+    {/* Description on tiny screens below xs */}
+    <p className="text-[11px] text-slate-400 font-pixel text-center mt-2 leading-relaxed px-1 block xs:hidden">
+      The ultimate multiplayer IPL auction simulator and game. Host live IPL
+      mega auctions with friends in real-time.
+    </p>
+  </div>
+);
+
 const LandingPage = () => {
   useDocumentTitle(
     "IplAuctoWorld - Multiplayer T20 Auction Simulator | By Yashwanth N & Vishal Pujari",
@@ -642,39 +738,7 @@ const LandingPage = () => {
         </div>
         <main className="relative w-full flex-1 flex flex-col items-center justify-start pt-6 sm:pt-8 px-3 sm:px-4 z-10 pb-20 sm:pb-32">
 
-        <div className="text-center mb-3 sm:mb-4 z-10 relative max-w-2xl px-2 sm:px-4 mt-1 sm:mt-2">
-          <h1 className="sr-only">
-            IplAuctoWorld - Fan-Made Multiplayer T20 Cricket Auction Simulator
-          </h1>
-
-          <div className="text-[clamp(1.25rem,2.8vw,2.35rem)] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white via-white/90 to-white/60">
-            CREATE YOUR
-          </div>
-          <div className="text-[clamp(2.1rem,5.6vw,3.85rem)] font-pixel leading-none uppercase text-balance mt-0.5 sm:mt-1 drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
-            AUCTION ROOM
-          </div>
-
-          <p className="text-xs sm:text-[13px] text-slate-400 font-pixel max-w-lg mx-auto mt-2 leading-relaxed px-1">
-            The ultimate multiplayer IPL auction simulator and game. Host live
-            IPL mega auctions with friends in real-time, choose your favorite
-            franchise, bid strategically, and build a championship T20 squad.
-          </p>
-
-          {/* Watermelon-style Micro Step Indicators */}
-          <div className="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 mt-2.5 sm:mt-3 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-[8.5px] sm:text-[9.5px] font-black tracking-wider sm:tracking-widest text-slate-400 uppercase select-none">
-            <span className="hover:text-slate-200 transition-colors">
-              ① Create Room
-            </span>
-            <span className="text-white/20">➔</span>
-            <span className="hover:text-slate-200 transition-colors">
-              ② Invite Friends
-            </span>
-            <span className="text-white/20">➔</span>
-            <span className="hover:text-slate-200 transition-colors">
-              ③ Start Bidding
-            </span>
-          </div>
-        </div>
+        <DeveloperHero />
 
         <PanelSurface className="mt-2 sm:mt-3">
           <div className="bg-[#0c0d10] rounded-[2.2rem] border border-white/10 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/10 overflow-hidden">
@@ -806,40 +870,8 @@ const LandingPage = () => {
       </div>
       <main className="relative w-full flex-1 flex flex-col items-center justify-start pt-6 sm:pt-8 px-3 sm:px-4 z-10 pb-20 sm:pb-32">
 
-      {/* Hero */}
-      <div className="text-center mb-3 sm:mb-4 z-10 relative max-w-2xl px-2 sm:px-4 mt-1 sm:mt-2">
-        <h1 className="sr-only">
-          IplAuctoWorld - Fan-Made Multiplayer T20 Cricket Auction Simulator
-        </h1>
-
-        <div className="text-[clamp(1.25rem,2.8vw,2.35rem)] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white via-white/90 to-white/60">
-          CREATE YOUR
-        </div>
-        <div className="text-[clamp(2.1rem,5.6vw,3.85rem)] font-pixel leading-none uppercase text-balance mt-0.5 sm:mt-1 drop-shadow-[0_2px_12px_rgba(255,255,255,0.08)]">
-          AUCTION ROOM
-        </div>
-
-        <p className="text-xs sm:text-[13px] text-slate-400 font-pixel max-w-lg mx-auto mt-2 leading-relaxed px-1">
-          The ultimate multiplayer IPL auction simulator and game. Host live IPL
-          mega auctions with friends in real-time, choose your favorite
-          franchise, bid strategically, and build a championship T20 squad.
-        </p>
-
-        {/* Watermelon-style Micro Step Indicators */}
-        <div className="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 mt-2.5 sm:mt-3 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-[8.5px] sm:text-[9.5px] font-black tracking-wider sm:tracking-widest text-slate-400 uppercase select-none">
-          <span className="hover:text-slate-200 transition-colors">
-            ① Create Room
-          </span>
-          <span className="text-white/20">➔</span>
-          <span className="hover:text-slate-200 transition-colors">
-            ② Invite Friends
-          </span>
-          <span className="text-white/20">➔</span>
-          <span className="hover:text-slate-200 transition-colors">
-            ③ Start Bidding
-          </span>
-        </div>
-      </div>
+      {/* Hero with Developer photos flanking the headline */}
+      <DeveloperHero />
 
       <PanelSurface className="mt-2 sm:mt-3">
         <div className="bg-[#0c0d10] rounded-[2.2rem] border border-white/10 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/10 overflow-hidden">
