@@ -1129,7 +1129,7 @@ const AuctionRoom = () => {
    }
 
    return (
-      <div className="h-screen-safe bg-[#000000] text-white font-sans flex flex-col items-center overflow-hidden relative selection:bg-white/20 selection:text-white">
+      <div className="h-screen-safe min-h-screen-safe w-full bg-[#000000] text-white font-sans flex flex-col items-center overflow-x-hidden overflow-y-auto md:overflow-hidden relative selection:bg-white/20 selection:text-white">
          <PageBackground showArt={false} />
 
          <header className="w-full h-14 compact:h-12 bg-[#0c0d10] backdrop-blur-md border-b border-white/10 flex flex-row items-center justify-between px-2.5 sm:px-4 md:px-6 z-50 gap-2 shrink-0">
@@ -1428,9 +1428,9 @@ const AuctionRoom = () => {
                </div>
             </aside>
 
-            <div className={`${mobileTab === 'arena' ? 'flex' : 'hidden'} md:flex flex-col flex-1 h-full overflow-hidden relative z-10`}>
+            <div className={`${mobileTab === 'arena' ? 'flex' : 'hidden'} md:flex flex-col flex-1 h-full min-h-0 overflow-hidden relative z-10`}>
                {/* Center Scrollable Main Body */}
-               <main className="flex-1 overflow-y-auto p-4 md:p-8 compact:p-4 pb-28 sm:pb-12 md:pb-8 flex flex-col items-center custom-scrollbar touch-pan-y">
+               <main className="flex-1 overflow-y-auto p-2.5 sm:p-4 md:p-8 compact:p-4 pb-28 sm:pb-12 md:pb-8 flex flex-col items-center custom-scrollbar overscroll-contain touch-pan-y">
                   <div className="w-full max-w-4xl flex flex-col gap-4 md:gap-6">
                      <AnimatePresence mode="wait">
                         {(displayAuctionState?.status === 'sold' || displayAuctionState?.status === 'unsold') ? (() => {
@@ -1545,7 +1545,7 @@ const AuctionRoom = () => {
                               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                               className="w-full flex-col gap-4 md:gap-6 flex will-change-transform"
                            >
-                              <div className="bg-[#0c0d10] border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.6)] relative min-h-[400px] lg:min-h-0">
+                              <div className="bg-[#0c0d10] border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.6)] relative min-h-[300px] sm:min-h-0">
                                  {/* Top-of-card progress bar across the flat top edge */}
                                  <AuctionCountdown
                                     variant="bar"
@@ -1555,7 +1555,7 @@ const AuctionRoom = () => {
                                  />
                                  <div className="p-0 sm:p-6 lg:p-5 xl:p-10 flex flex-col lg:flex-row items-center sm:gap-6 lg:gap-5 xl:gap-10">
                                     {/* 1. Hero image: edge-to-edge on mobile, framed box on desktop/tablet */}
-                                    <div className="relative w-full aspect-[4/3] max-h-[42vh] min-h-[300px] sm:aspect-auto sm:max-h-none sm:min-h-0 sm:w-36 sm:h-36 lg:w-36 lg:h-48 xl:w-60 xl:h-80 bg-[#0c0d10] sm:rounded-2xl lg:sm:rounded-[2rem] overflow-hidden sm:border sm:border-white/10 z-10 sm:shadow-[0_12px_40px_rgba(0,0,0,0.4)] group sm:hover:scale-[1.02] transition-transform duration-500 shrink-0">
+                                    <div className="relative w-full aspect-[4/3] max-h-[26vh] xs:max-h-[30vh] min-h-[160px] sm:aspect-auto sm:max-h-none sm:min-h-0 sm:w-36 sm:h-36 lg:w-36 lg:h-48 xl:w-60 xl:h-80 bg-[#0c0d10] sm:rounded-2xl lg:sm:rounded-[2rem] overflow-hidden sm:border sm:border-white/10 z-10 sm:shadow-[0_12px_40px_rgba(0,0,0,0.4)] group sm:hover:scale-[1.02] transition-transform duration-500 shrink-0">
                                        <img
                                           src={currentPlayer.image}
                                           alt={currentPlayer.name}

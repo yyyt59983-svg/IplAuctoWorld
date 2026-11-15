@@ -633,7 +633,7 @@ const LandingPage = () => {
   // ─── Not Signed In: Show Google / Guest Login ───
   if (!user) {
     return (
-      <div className="relative min-h-screen bg-transparent flex flex-col font-sans text-white overflow-x-clip">
+      <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto">
         <PageBackground />
 
         <div className="relative z-50 w-full">
@@ -797,7 +797,7 @@ const LandingPage = () => {
 
   // ─── Signed In: Show Create / Join / History ───
   return (
-    <div className="relative min-h-screen bg-transparent flex flex-col font-sans text-white overflow-x-clip">
+    <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto">
       <PageBackground />
 
       <div className="relative z-50 w-full">

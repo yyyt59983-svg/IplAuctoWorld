@@ -33,16 +33,29 @@
   }
 }
 
+html {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
+  padding: 0;
   font-family: var(--font-sans);
   background-color: black;
   color: white;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: clip;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-height: 100vh;
   min-height: 100dvh;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Global Mobile Touch Responsiveness & Instant Tap Feedback */
@@ -50,8 +63,7 @@ button,
 a, 
 input, 
 select, 
-textarea, 
-[role="button"] {
+textarea {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -63,17 +75,41 @@ button, .no-select {
   user-select: none;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
-*::-webkit-scrollbar {
-  display: none;
+/* Modern, sleek custom scrollbar for desktop & touch devices */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
+::-webkit-scrollbar-track {
+  background: rgba(10, 14, 26, 0.7);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
 * {
-  -ms-overflow-style: none;
-  /* IE and Edge */
-  scrollbar-width: none;
-  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(10, 14, 26, 0.7);
+}
+
+/* Utility to hide scrollbar where needed (e.g. horizontal pill chips) */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+}
+
+.no-scrollbar,
+.scrollbar-hide {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 .glass {

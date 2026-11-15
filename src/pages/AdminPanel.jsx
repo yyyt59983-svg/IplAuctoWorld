@@ -639,7 +639,7 @@ const AdminPanel = () => {
   // ─── Render Authentication Lock Screen if Not Admin ───
   if (!user) {
     return (
-      <div className="relative min-h-screen bg-transparent flex flex-col font-sans text-white overflow-x-clip items-center justify-center p-4 sm:p-6 selection:bg-white/20 selection:text-white">
+      <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto items-center justify-center p-4 sm:p-6 selection:bg-white/20 selection:text-white">
         <PageBackground />
         <div className="fixed top-1/4 right-1/4 w-80 sm:w-96 h-80 sm:h-96 bg-white/[0.02] blur-[120px] rounded-full pointer-events-none z-0" />
         <div className="fixed bottom-10 left-1/4 w-80 sm:w-96 h-80 sm:h-96 bg-slate-500/[0.02] blur-[120px] rounded-full pointer-events-none z-0" />
@@ -689,7 +689,7 @@ const AdminPanel = () => {
 
   if (!isAdmin) {
     return (
-      <div className="relative min-h-screen bg-transparent flex flex-col font-sans text-white overflow-x-clip items-center justify-center p-4 sm:p-6 selection:bg-white/20 selection:text-white">
+      <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto items-center justify-center p-4 sm:p-6 selection:bg-white/20 selection:text-white">
         <PageBackground />
         <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-rose-500/[0.03] blur-[150px] rounded-full pointer-events-none z-0" />
 
@@ -736,7 +736,7 @@ const AdminPanel = () => {
 
   // ─── Admin Dashboard Interface ───
   return (
-    <div className="relative min-h-screen bg-transparent flex flex-col font-sans text-white overflow-x-clip selection:bg-white/20 selection:text-white">
+    <div className="relative min-h-screen w-full bg-transparent flex flex-col font-sans text-white overflow-x-hidden overflow-y-auto selection:bg-white/20 selection:text-white">
       <PageBackground />
 
       {/* Atmospheric depth blurs (no orange/colored halos) */}

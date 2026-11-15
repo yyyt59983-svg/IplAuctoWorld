@@ -557,7 +557,7 @@ const Lobby = () => {
 
   // ─── Authenticated State ───
   return (
-    <div className="relative min-h-screen bg-transparent flex flex-col items-center pt-8 px-4 font-sans text-white overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-transparent flex flex-col items-center pt-8 px-4 font-sans text-white overflow-x-hidden overflow-y-auto">
 
       {actionError && (
         <div
