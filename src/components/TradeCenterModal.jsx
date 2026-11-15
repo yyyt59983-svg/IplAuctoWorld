@@ -1,0 +1,441 @@
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeftRight,
+  Shield,
+  Coins,
+  CheckCircle2,
+  AlertTriangle,
+  X,
+  Users,
+  Sparkles,
+  ChevronRight,
+  TrendingUp,
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { TEAMS } from '../data/teams';
+import { toFiniteNumber, formatCrores, countOverseas, isOverseasPlayer } from '../lib/auctionDisplay';
+import { validatePlayerTrade } from '../lib/auctionRules';
+import { evaluateBotTrade } from '../lib/botEngine';
+
+export default function TradeCenterModal({
+  isOpen,
+  onClose,
+  myTeam,
+  allTeams = [],
+  onExecuteTrade,
+}) {
+  const myTeamId = myTeam?.teamId || myTeam?.team;
+  const myTeamObj = TEAMS.find((t) => t.id === myTeamId) || TEAMS[0];
+
+  // Rival teams list
+  const availableRivalTeams = useMemo(() => {
+    return allTeams.filter((t) => {
+      const id = t.teamId || t.team;
+      return id && id !== myTeamId;
+    });
+  }, [allTeams, myTeamId]);
+
+  const [selectedPartnerId, setSelectedPartnerId] = useState(
+    availableRivalTeams[0]?.teamId || availableRivalTeams[0]?.team || 'MI'
+  );
+  const [selectedPlayerToGive, setSelectedPlayerToGive] = useState(null);
+  const [selectedPlayerToReceive, setSelectedPlayerToReceive] = useState(null);
+  const [cashFromMe, setCashFromMe] = useState(0);
+  const [tradeStatus, setTradeStatus] = useState(null); // { type: 'success' | 'error', message: string }
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const partnerTeam = useMemo(() => {
+    return (
+      allTeams.find((t) => (t.teamId || t.team) === selectedPartnerId) || {
+        teamId: selectedPartnerId,
+        teamName: TEAMS.find((t) => t.id === selectedPartnerId)?.name || 'Franchise',
+        squad: [],
+        budgetRemaining: 150,
+        spent: 0,
+      }
+    );
+  }, [allTeams, selectedPartnerId]);
+
+  const partnerTeamObj = TEAMS.find((t) => t.id === selectedPartnerId) || TEAMS[1];
+
+  // My squad list
+  const mySquad = useMemo(() => {
+    return Array.isArray(myTeam?.squad) ? myTeam.squad : [];
+  }, [myTeam]);
+
+  // Partner squad list
+  const partnerSquad = useMemo(() => {
+    return Array.isArray(partnerTeam?.squad) ? partnerTeam.squad : [];
+  }, [partnerTeam]);
+
+  // Real-time Trade Validation
+  const validation = useMemo(() => {
+    if (!myTeam || !partnerTeam) return { isValid: false, reason: 'Select franchises' };
+    if (!selectedPlayerToGive && !selectedPlayerToReceive && cashFromMe === 0) {
+      return { isValid: false, reason: 'Select at least one player or purse amount' };
+    }
+    return validatePlayerTrade({
+      teamA: myTeam,
+      teamB: partnerTeam,
+      playerA: selectedPlayerToGive,
+      playerB: selectedPlayerToReceive,
+      cashFromA: cashFromMe,
+      cashFromB: 0,
+    });
+  }, [myTeam, partnerTeam, selectedPlayerToGive, selectedPlayerToReceive, cashFromMe]);
+
+  // Preview AI Coach sentiment
+  const coachSentiment = useMemo(() => {
+    if (!partnerTeam || (!selectedPlayerToGive && !selectedPlayerToReceive && cashFromMe === 0)) {
+      return null;
+    }
+    return evaluateBotTrade({
+      botTeam: partnerTeam,
+      humanTeam: myTeam,
+      playerOffered: selectedPlayerToGive,
+      playerRequested: selectedPlayerToReceive,
+      cashOffered: cashFromMe,
+      cashRequested: 0,
+    });
+  }, [partnerTeam, myTeam, selectedPlayerToGive, selectedPlayerToReceive, cashFromMe]);
+
+  const handleTradeSubmit = async () => {
+    if (!validation.isValid) return;
+    setIsSubmitting(true);
+    setTradeStatus(null);
+
+    try {
+      if (onExecuteTrade) {
+        const res = await onExecuteTrade({
+          partnerTeamId: selectedPartnerId,
+          playerOffered: selectedPlayerToGive,
+          playerRequested: selectedPlayerToReceive,
+          cashOffered: Number(cashFromMe) || 0,
+          cashRequested: 0,
+        });
+
+        if (res?.success) {
+          confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 },
+          });
+          setTradeStatus({
+            type: 'success',
+            message: res.message || 'Trade officially executed and approved!',
+          });
+          setSelectedPlayerToGive(null);
+          setSelectedPlayerToReceive(null);
+          setCashFromMe(0);
+        } else {
+          setTradeStatus({
+            type: 'error',
+            message: res?.reason || 'Trade was declined by the franchise coach.',
+          });
+        }
+      }
+    } catch (err) {
+      setTradeStatus({
+        type: 'error',
+        message: err.message || 'Failed to submit trade proposal.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-[#0e1118] via-[#090b10] to-[#050608] p-5 sm:p-7 text-white shadow-[0_25px_80px_rgba(6,182,212,0.2)]"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
+                <ArrowLeftRight className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+                    TRANSFER WINDOW
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">PLAYER SWAP & CASH CONSIDERATIONS</span>
+                </div>
+                <h2 className="text-lg sm:text-2xl font-pixel uppercase tracking-tight text-white mt-0.5">
+                  IPL TRADE CENTER
+                </h2>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Franchise Selector Bar */}
+          <div className="mt-4">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              Select Trading Partner Franchise:
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+              {availableRivalTeams.map((t) => {
+                const teamId = t.teamId || t.team;
+                const meta = TEAMS.find((item) => item.id === teamId);
+                const isSelected = selectedPartnerId === teamId;
+                return (
+                  <button
+                    key={teamId}
+                    onClick={() => {
+                      setSelectedPartnerId(teamId);
+                      setSelectedPlayerToReceive(null);
+                      setTradeStatus(null);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shrink-0 ${
+                      isSelected
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/20'
+                        : 'bg-white/[0.02] border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
+                    }`}
+                  >
+                    <span>{meta?.shortName || teamId}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">({t.squad?.length || 0})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Trading Workbench: Split Screen */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left: Your Squad */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
+              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-cyan-400">Your Squad</span>
+                  <div className="font-bold text-sm text-white">{myTeamObj.name}</div>
+                </div>
+                <div className="text-right text-xs font-mono text-slate-300">
+                  Purse: ₹{formatCrores(myTeam?.budgetRemaining)} Cr
+                </div>
+              </div>
+
+              <div className="mt-3 flex-1 min-h-[160px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                {mySquad.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-xs text-slate-500 italic py-6">
+                    No players in squad to offer
+                  </div>
+                ) : (
+                  mySquad.map((player) => {
+                    const isSelected = selectedPlayerToGive?.id === player.id;
+                    return (
+                      <div
+                        key={player.id}
+                        onClick={() => setSelectedPlayerToGive(isSelected ? null : player)}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-cyan-500/20 border-cyan-400 shadow-sm'
+                            : 'bg-white/[0.02] border-white/5 hover:border-white/15'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
+                            {player.name?.[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white truncate">{player.name}</div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                              <span>{player.role}</span>
+                              {player.isRetained && (
+                                <span className="text-amber-400 font-bold">⭐ RETAINED</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs font-mono font-bold text-cyan-300">
+                          ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {selectedPlayerToGive && (
+                <div className="mt-3 p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs flex items-center justify-between">
+                  <span className="text-slate-300">Offering:</span>
+                  <span className="font-bold text-cyan-300">{selectedPlayerToGive.name}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Partner Squad */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
+              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-blue-400">Target Franchise</span>
+                  <div className="font-bold text-sm text-white">{partnerTeamObj.name}</div>
+                </div>
+                <div className="text-right text-xs font-mono text-slate-300">
+                  Purse: ₹{formatCrores(partnerTeam?.budgetRemaining)} Cr
+                </div>
+              </div>
+
+              <div className="mt-3 flex-1 min-h-[160px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                {partnerSquad.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-xs text-slate-500 italic py-6">
+                    No players in target squad
+                  </div>
+                ) : (
+                  partnerSquad.map((player) => {
+                    const isSelected = selectedPlayerToReceive?.id === player.id;
+                    return (
+                      <div
+                        key={player.id}
+                        onClick={() => setSelectedPlayerToReceive(isSelected ? null : player)}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-blue-500/20 border-blue-400 shadow-sm'
+                            : 'bg-white/[0.02] border-white/5 hover:border-white/15'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
+                            {player.name?.[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white truncate">{player.name}</div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                              <span>{player.role}</span>
+                              {player.isRetained && (
+                                <span className="text-amber-400 font-bold">⭐ RETAINED</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs font-mono font-bold text-blue-300">
+                          ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {selectedPlayerToReceive && (
+                <div className="mt-3 p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs flex items-center justify-between">
+                  <span className="text-slate-300">Receiving:</span>
+                  <span className="font-bold text-blue-300">{selectedPlayerToReceive.name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cash consideration adjustment */}
+          <div className="mt-4 p-3 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Coins className="w-5 h-5 text-amber-400" />
+              <div>
+                <div className="text-xs font-bold text-white">Extra Purse Consideration Offered</div>
+                <div className="text-[10px] text-slate-400">Sweeten the trade deal by transferring purse funds</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {[0, 1.0, 2.5, 5.0].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => setCashFromMe(amt)}
+                  className={`px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
+                    cashFromMe === amt
+                      ? 'bg-amber-400 text-black border-amber-400 shadow-md shadow-amber-400/20'
+                      : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'
+                  }`}
+                >
+                  {amt === 0 ? 'None' : `+₹${amt} Cr`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Coach sentiment preview */}
+          {coachSentiment && (
+            <div className="mt-3 p-3 rounded-2xl bg-blue-950/20 border border-blue-500/30 flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-[10px] uppercase font-bold text-cyan-300">
+                  {partnerTeamObj.botName || 'Franchise Management'} Assessment
+                </div>
+                <div className="text-xs text-slate-200 mt-0.5 italic">{coachSentiment.message}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Trade status alert */}
+          {tradeStatus && (
+            <div
+              className={`mt-3 p-3 rounded-2xl text-xs flex items-center gap-2.5 border ${
+                tradeStatus.type === 'success'
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                  : 'bg-red-500/15 border-red-500/40 text-red-200'
+              }`}
+            >
+              {tradeStatus.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 shrink-0 text-red-400" />
+              )}
+              <span>{tradeStatus.message}</span>
+            </div>
+          )}
+
+          {/* Submission Action */}
+          <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+            <div className="text-xs text-slate-400">
+              {validation.isValid ? (
+                <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                  <CheckCircle2 className="w-4 h-4" /> Valid Trade Parameters
+                </span>
+              ) : (
+                <span className="text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4" /> {validation.reason}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-all"
+              >
+                Close
+              </button>
+
+              <button
+                onClick={handleTradeSubmit}
+                disabled={!validation.isValid || isSubmitting}
+                className={`py-2.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all ${
+                  validation.isValid && !isSubmitting
+                    ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white hover:brightness-110 shadow-lg shadow-cyan-500/25 active:scale-[0.98]'
+                    : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/5'
+                }`}
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+                <span>{isSubmitting ? 'Processing...' : 'EXECUTE TRADE DEAL'}</span>
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}
