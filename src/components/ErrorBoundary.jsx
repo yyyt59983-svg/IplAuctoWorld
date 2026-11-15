@@ -8,13 +8,11 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
-    if (import.meta.env.DEV) {
-      console.error("Uncaught error:", error, errorInfo);
-    }
+    console.error("Uncaught error:", error, errorInfo);
     this.setState({
       error: error,
       errorInfo: errorInfo
@@ -57,15 +55,15 @@ class ErrorBoundary extends React.Component {
               </button>
             </div>
 
-            {import.meta.env.DEV && this.state.error && (
+            {this.state.error && (
               <div className="mt-8 text-left border-t border-white/10 pt-6">
-                <details className="group">
-                  <summary className="text-[11px] font-mono text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-300 transition-colors list-none flex items-center gap-2 select-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500 group-open:bg-white" />
-                    Technical details
+                <details className="group" open>
+                  <summary className="text-[11px] font-mono text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors list-none flex items-center gap-2 select-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 group-open:bg-white" />
+                    Error details
                   </summary>
-                  <div className="mt-3 p-4 bg-white/[0.02] border border-white/5 rounded-xl overflow-auto max-h-48 scrollbar-hide">
-                    <pre className="text-[11px] font-mono text-slate-400 whitespace-pre-wrap leading-relaxed">
+                  <div className="mt-3 p-4 bg-white/[0.04] border border-white/10 rounded-xl overflow-auto max-h-48 scrollbar-hide">
+                    <pre className="text-[11px] font-mono text-red-300 whitespace-pre-wrap leading-relaxed">
                       {this.state.error.toString()}
                       {this.state.errorInfo?.componentStack}
                     </pre>

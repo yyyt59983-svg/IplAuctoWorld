@@ -2987,7 +2987,7 @@ export const AuctionProvider = ({ children }) => {
       return;
     }
 
-    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const rtdbInstance = getRtdb(currentAuction?.server);
     const liveRef = ref(rtdbInstance, `auctions/${roomId}/live`);
     const liveSnap = await get(liveRef);
     if (!liveSnap.exists()) return;
@@ -3043,7 +3043,7 @@ export const AuctionProvider = ({ children }) => {
       return;
     }
 
-    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const rtdbInstance = getRtdb(currentAuction?.server);
     const liveRef = ref(rtdbInstance, `auctions/${roomId}/live`);
     const liveSnap = await get(liveRef);
     if (!liveSnap.exists()) return;
@@ -3096,7 +3096,7 @@ export const AuctionProvider = ({ children }) => {
       return { success: false, reason: val.reason };
     }
 
-    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const rtdbInstance = getRtdb(currentAuction?.server);
 
     // AI Bot trade: evaluate and execute immediately
     if (partnerTeamDoc.userId && String(partnerTeamDoc.userId).startsWith('bot_')) {
@@ -3200,7 +3200,7 @@ export const AuctionProvider = ({ children }) => {
   const respondToTrade = useCallback(async (tradeId, action) => {
     if (!currentAuction?.id || !tradeId) return { success: false, reason: 'Invalid parameters' };
     const roomId = currentAuction.id;
-    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const rtdbInstance = getRtdb(currentAuction?.server);
     const tradeRef = ref(rtdbInstance, `auctions/${roomId}/trades/${tradeId}`);
 
     const tradeSnap = await get(tradeRef);
@@ -3295,7 +3295,7 @@ export const AuctionProvider = ({ children }) => {
   const cancelTrade = useCallback(async (tradeId) => {
     if (!currentAuction?.id || !tradeId) return;
     const roomId = currentAuction.id;
-    const rtdbInstance = getRtdbInstance(currentAuction?.server);
+    const rtdbInstance = getRtdb(currentAuction?.server);
     const tradeRef = ref(rtdbInstance, `auctions/${roomId}/trades/${tradeId}`);
     await updateRtdb(tradeRef, { status: 'cancelled', cancelledAt: Date.now() });
   }, [currentAuction]);
