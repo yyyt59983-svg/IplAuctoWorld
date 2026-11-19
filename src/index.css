@@ -21,14 +21,49 @@
 @custom-variant compact (@media (min-width: 768px) and (max-width: 1279.98px));
 
 /* ── Mobile-safe full viewport height ───────────────────────────────────────
-   Uses the dynamic viewport height (dvh) so bottom-fixed chrome such as the
-   auction room's mobile nav bar stays visible when mobile browsers show/hide
-   their URL toolbar. Falls back to 100vh on browsers without dvh support.    */
+   Uses dynamic viewport height (dvh) and -webkit-fill-available so iPhone
+   Safari navigation bars, Dynamic Island, and home indicator swipe bars do
+   not cover or displace controls. Falls back to 100vh.                     */
 @utility h-screen-safe {
   height: 100vh;
+  height: -webkit-fill-available;
 
   @supports (height: 100dvh) {
     height: 100dvh;
+  }
+}
+
+@utility min-h-screen-safe {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+
+  @supports (min-height: 100dvh) {
+    min-height: 100dvh;
+  }
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Prevent iOS Safari destructive auto-zoom on input focus by guaranteeing 16px minimum */
+@supports (-webkit-touch-callout: none) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
 

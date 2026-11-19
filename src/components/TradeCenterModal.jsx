@@ -19,10 +19,48 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { TEAMS } from '../data/teams';
+import { IPL_PLAYERS } from '../data/players';
 import { toFiniteNumber, formatCrores, countOverseas, isOverseasPlayer } from '../lib/auctionDisplay';
 import { validatePlayerTrade } from '../lib/auctionRules';
 import { evaluateBotTrade } from '../lib/botEngine';
 import { getTeamInitialState } from '../data/retentions';
+
+/**
+ * Hydrates squad entries (which may be raw IDs, retention objects, or auction purchases)
+ * with complete player bio, role, country, image, and accurate valuation.
+ */
+const hydrateSquadList = (rawSquad) => {
+  if (!Array.isArray(rawSquad)) return [];
+  return rawSquad
+    .map((entry) => {
+      if (!entry) return null;
+      const pid = typeof entry === 'string' ? entry : entry.id;
+      if (!pid) return null;
+      const baseInfo = IPL_PLAYERS.find((p) => String(p.id) === String(pid)) || {};
+      const isRetained = Boolean(
+        (typeof entry === 'object' && entry.isRetained) || baseInfo.isRetained
+      );
+      const cost = toFiniteNumber(
+        entry.bid ?? entry.soldPrice ?? entry.retentionCost ?? entry.cost ?? baseInfo.basePrice,
+        0
+      );
+      return {
+        ...baseInfo,
+        ...(typeof entry === 'object' ? entry : {}),
+        id: pid,
+        name: entry.name || baseInfo.name || `Player #${pid}`,
+        role: entry.role || baseInfo.role || 'All-Rounder',
+        country: entry.country || baseInfo.country || 'IND',
+        image: entry.image || baseInfo.image || '',
+        cost,
+        bid: cost,
+        soldPrice: cost,
+        isRetained,
+        isAuctionPurchase: !isRetained,
+      };
+    })
+    .filter(Boolean);
+};
 
 export default function TradeCenterModal({
   isOpen,
@@ -39,16 +77,42 @@ export default function TradeCenterModal({
   const myTeamId = myTeam?.teamId || myTeam?.team;
   const myTeamObj = TEAMS.find((t) => t.id === myTeamId) || TEAMS[0];
 
-  // Rival teams list
+  // Rival teams list across ALL 10 IPL franchises (allows trading with ANY chosen franchise)
   const availableRivalTeams = useMemo(() => {
-    return allTeams.filter((t) => {
-      const id = t.teamId || t.team;
-      return id && id !== myTeamId;
+    return TEAMS.filter((meta) => meta.id !== myTeamId).map((meta) => {
+      const foundInRoom = (allTeams || []).find((t) => (t.teamId || t.team) === meta.id);
+      if (foundInRoom) {
+        const effBudget = foundInRoom.budgetRemaining ?? Math.max(0, 150 - (foundInRoom.spent || 0));
+        return {
+          ...foundInRoom,
+          teamId: meta.id,
+          team: meta.id,
+          teamName: foundInRoom.teamName || meta.name,
+          shortName: meta.shortName || meta.id,
+          budgetRemaining: effBudget,
+          meta,
+          isManagedInRoom: true,
+        };
+      }
+      const defaultInit = getTeamInitialState(meta.id, 150);
+      return {
+        teamId: meta.id,
+        team: meta.id,
+        teamName: meta.name,
+        shortName: meta.shortName || meta.id,
+        userId: `bot_${meta.id}`,
+        squad: defaultInit.squad,
+        budgetRemaining: defaultInit.budgetRemaining,
+        spent: defaultInit.spent,
+        rtmCards: defaultInit.rtmCards,
+        meta,
+        isManagedInRoom: false,
+      };
     });
   }, [allTeams, myTeamId]);
 
   const [selectedPartnerId, setSelectedPartnerId] = useState(
-    availableRivalTeams[0]?.teamId || availableRivalTeams[0]?.team || 'MI'
+    availableRivalTeams[0]?.teamId || 'MI'
   );
   const [selectedPlayerToGive, setSelectedPlayerToGive] = useState(null);
   const [selectedPlayerToReceive, setSelectedPlayerToReceive] = useState(null);
@@ -58,33 +122,25 @@ export default function TradeCenterModal({
   const [processingTradeId, setProcessingTradeId] = useState(null);
 
   const partnerTeam = useMemo(() => {
-    const found = allTeams.find((t) => (t.teamId || t.team) === selectedPartnerId);
-    if (found) {
-      const effBudget = found.budgetRemaining ?? Math.max(0, 150 - (found.spent || 0));
-      return { ...found, budgetRemaining: effBudget };
-    }
-    const defaultInit = getTeamInitialState(selectedPartnerId, 150);
-    return {
-      teamId: selectedPartnerId,
-      teamName: TEAMS.find((t) => t.id === selectedPartnerId)?.name || 'Franchise',
-      squad: defaultInit.squad,
-      budgetRemaining: defaultInit.budgetRemaining,
-      spent: defaultInit.spent,
-    };
-  }, [allTeams, selectedPartnerId]);
+    const found = availableRivalTeams.find((t) => t.teamId === selectedPartnerId);
+    return found || availableRivalTeams[0] || null;
+  }, [availableRivalTeams, selectedPartnerId]);
 
-  const partnerTeamObj = TEAMS.find((t) => t.id === selectedPartnerId) || TEAMS[1];
-  const isPartnerBot = Boolean(partnerTeam?.userId && String(partnerTeam.userId).startsWith('bot_'));
+  const partnerTeamObj = TEAMS.find((t) => t.id === (partnerTeam?.teamId || selectedPartnerId)) || TEAMS[1];
+  const isPartnerBot = Boolean(
+    !partnerTeam?.isManagedInRoom ||
+    (partnerTeam?.userId && String(partnerTeam.userId).startsWith('bot_'))
+  );
 
-  // My squad list
+  // My squad list (fully hydrated: includes BOTH Retentions and live Auction Buys)
   const mySquad = useMemo(() => {
-    return Array.isArray(myTeam?.squad) ? myTeam.squad : [];
-  }, [myTeam]);
+    return hydrateSquadList(myTeam?.squad);
+  }, [myTeam?.squad]);
 
-  // Partner squad list
+  // Partner squad list (fully hydrated: includes BOTH Retentions and live Auction Buys)
   const partnerSquad = useMemo(() => {
-    return Array.isArray(partnerTeam?.squad) ? partnerTeam.squad : [];
-  }, [partnerTeam]);
+    return hydrateSquadList(partnerTeam?.squad);
+  }, [partnerTeam?.squad]);
 
   // Real-time Trade Validation
   const validation = useMemo(() => {
@@ -471,21 +527,34 @@ export default function TradeCenterModal({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
-                                {player.name?.[0]}
+                              <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono overflow-hidden shrink-0">
+                                {player.image ? (
+                                  <img src={player.image} alt={player.name} className="w-full h-full object-cover object-top" />
+                                ) : (
+                                  <span>{player.name?.[0] || '🏏'}</span>
+                                )}
                               </div>
                               <div className="min-w-0">
                                 <div className="text-xs font-bold text-white truncate">{player.name}</div>
-                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
                                   <span>{player.role}</span>
-                                  {player.isRetained && (
-                                    <span className="text-amber-400 font-bold">⭐ RETAINED</span>
+                                  {player.country && player.country !== 'IND' && (
+                                    <span className="text-[8.5px] px-1 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono">✈️ OS</span>
+                                  )}
+                                  {player.isRetained ? (
+                                    <span className="text-amber-400 font-bold text-[8.5px] px-1 py-0.2 rounded bg-amber-400/10 border border-amber-400/20">
+                                      ⭐ RETAINED
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-400 font-bold text-[8.5px] px-1 py-0.2 rounded bg-emerald-400/10 border border-emerald-400/20">
+                                      🔨 AUCTION BUY
+                                    </span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            <div className="text-right text-xs font-mono font-bold text-cyan-300">
-                              ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
+                            <div className="text-right text-xs font-mono font-bold text-cyan-300 shrink-0">
+                              ₹{formatCrores(player.cost || player.bid || player.soldPrice || player.retentionCost || player.basePrice)} Cr
                             </div>
                           </div>
                         );
@@ -532,21 +601,34 @@ export default function TradeCenterModal({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono">
-                                {player.name?.[0]}
+                              <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center text-xs font-bold font-mono overflow-hidden shrink-0">
+                                {player.image ? (
+                                  <img src={player.image} alt={player.name} className="w-full h-full object-cover object-top" />
+                                ) : (
+                                  <span>{player.name?.[0] || '🏏'}</span>
+                                )}
                               </div>
                               <div className="min-w-0">
                                 <div className="text-xs font-bold text-white truncate">{player.name}</div>
-                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
                                   <span>{player.role}</span>
-                                  {player.isRetained && (
-                                    <span className="text-amber-400 font-bold">⭐ RETAINED</span>
+                                  {player.country && player.country !== 'IND' && (
+                                    <span className="text-[8.5px] px-1 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono">✈️ OS</span>
+                                  )}
+                                  {player.isRetained ? (
+                                    <span className="text-amber-400 font-bold text-[8.5px] px-1 py-0.2 rounded bg-amber-400/10 border border-amber-400/20">
+                                      ⭐ RETAINED
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-400 font-bold text-[8.5px] px-1 py-0.2 rounded bg-emerald-400/10 border border-emerald-400/20">
+                                      🔨 AUCTION BUY
+                                    </span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            <div className="text-right text-xs font-mono font-bold text-blue-300">
-                              ₹{formatCrores(player.bid || player.retentionCost || player.basePrice)}
+                            <div className="text-right text-xs font-mono font-bold text-blue-300 shrink-0">
+                              ₹{formatCrores(player.cost || player.bid || player.soldPrice || player.retentionCost || player.basePrice)} Cr
                             </div>
                           </div>
                         );

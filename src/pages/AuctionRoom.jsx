@@ -500,21 +500,25 @@ const AuctionRoom = () => {
       }
    }, [selectedVoiceName]);
 
-   // Core Text-to-Speech call
+   // Core Text-to-Speech call (safely guarded against iOS WebKit unhandled speech synthesis errors)
    const speak = (text) => {
       if (!isTtsEnabled) return;
-      if ('speechSynthesis' in window) {
-         window.speechSynthesis.cancel(); // cancel any active or queued speech immediately
-         const utterance = new SpeechSynthesisUtterance(text);
-         const voices = window.speechSynthesis.getVoices();
+      try {
+         if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // cancel any active or queued speech immediately
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices?.() || [];
 
-         const chosenVoice = voices.find(v => v.name === selectedVoiceName) || voices.find(v => v.name.toLowerCase().includes("david")) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-         if (chosenVoice) {
-            utterance.voice = chosenVoice;
+            const chosenVoice = voices.find(v => v.name === selectedVoiceName) || voices.find(v => v.name?.toLowerCase().includes("david")) || voices.find(v => v.lang?.startsWith('en')) || voices[0];
+            if (chosenVoice) {
+               utterance.voice = chosenVoice;
+            }
+            utterance.rate = ttsSpeed;
+            utterance.pitch = ttsPitch;
+            window.speechSynthesis.speak(utterance);
          }
-         utterance.rate = ttsSpeed;
-         utterance.pitch = ttsPitch;
-         window.speechSynthesis.speak(utterance);
+      } catch (err) {
+         console.warn('[TTS] Speech synthesis unavailable or blocked:', err);
       }
    };
 

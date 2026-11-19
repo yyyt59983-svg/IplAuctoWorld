@@ -283,10 +283,10 @@ export function validatePlayerTrade({
   const squadA = normalizeSquad(teamA.squad);
   const squadB = normalizeSquad(teamB.squad);
 
-  if (playerA && !squadA.some((p) => getSquadEntryId(p) === playerA.id)) {
+  if (playerA && !squadA.some((p) => String(getSquadEntryId(p)) === String(playerA.id))) {
     return { isValid: false, reason: `${teamA.teamName || 'Team A'} does not own ${playerA.name}` };
   }
-  if (playerB && !squadB.some((p) => getSquadEntryId(p) === playerB.id)) {
+  if (playerB && !squadB.some((p) => String(getSquadEntryId(p)) === String(playerB.id))) {
     return { isValid: false, reason: `${teamB.teamName || 'Team B'} does not own ${playerB.name}` };
   }
 
@@ -300,13 +300,13 @@ export function validatePlayerTrade({
     return { isValid: false, reason: `${teamB.teamName || 'Team B'} would exceed squad limit (${squadLimit})` };
   }
 
-  const newSquadA = squadA.filter((p) => getSquadEntryId(p) !== playerA?.id);
+  const newSquadA = squadA.filter((p) => String(getSquadEntryId(p)) !== String(playerA?.id));
   if (playerB) newSquadA.push(playerB);
   if (countOverseas(newSquadA) > toFiniteNumber(overseasLimit, 8)) {
     return { isValid: false, reason: `${teamA.teamName || 'Team A'} would exceed overseas limit (${overseasLimit})` };
   }
 
-  const newSquadB = squadB.filter((p) => getSquadEntryId(p) !== playerB?.id);
+  const newSquadB = squadB.filter((p) => String(getSquadEntryId(p)) !== String(playerB?.id));
   if (playerA) newSquadB.push(playerA);
   if (countOverseas(newSquadB) > toFiniteNumber(overseasLimit, 8)) {
     return { isValid: false, reason: `${teamB.teamName || 'Team B'} would exceed overseas limit (${overseasLimit})` };
@@ -337,10 +337,10 @@ export function executePlayerTradeInSquads({
   cashFromA = 0,
   cashFromB = 0,
 }) {
-  const squadA = normalizeSquad(teamA.squad).filter((p) => getSquadEntryId(p) !== playerA?.id);
+  const squadA = normalizeSquad(teamA.squad).filter((p) => String(getSquadEntryId(p)) !== String(playerA?.id));
   if (playerB) squadA.push({ ...playerB, teamId: teamA.teamId || teamA.team });
 
-  const squadB = normalizeSquad(teamB.squad).filter((p) => getSquadEntryId(p) !== playerB?.id);
+  const squadB = normalizeSquad(teamB.squad).filter((p) => String(getSquadEntryId(p)) !== String(playerB?.id));
   if (playerA) squadB.push({ ...playerA, teamId: teamB.teamId || teamB.team });
 
   const netCashFromA = toFiniteNumber(cashFromA, 0) - toFiniteNumber(cashFromB, 0);

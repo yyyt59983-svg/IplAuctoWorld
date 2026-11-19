@@ -975,7 +975,28 @@ export function localAuctionReducer(state, action) {
       } = action;
 
       const teamA = state.roomTeams.find((t) => t.teamId === teamAId);
-      const teamB = state.roomTeams.find((t) => t.teamId === teamBId);
+      let teamB = state.roomTeams.find((t) => t.teamId === teamBId);
+
+      if (!teamB) {
+        const budget = state.settings?.budget || 150.0;
+        const isMega = state.auctionType === 'mega' || !state.auctionType;
+        const initState = isMega
+          ? getTeamInitialState(teamBId, budget)
+          : { budgetRemaining: budget, spent: 0, squad: [], rtmCards: 0 };
+        const teamMeta = TEAMS.find((t) => t.id === teamBId);
+        teamB = {
+          teamId: teamBId,
+          team: teamBId,
+          teamName: teamMeta?.name || teamBId,
+          shortName: teamMeta?.shortName || teamBId,
+          userId: `bot_${teamBId}`,
+          squad: initState.squad || [],
+          budgetRemaining: initState.budgetRemaining ?? budget,
+          spent: initState.spent ?? 0,
+          rtmCards: initState.rtmCards ?? 0,
+          squadCount: (initState.squad || []).length,
+        };
+      }
 
       const validation = validatePlayerTrade({
         teamA,
@@ -1001,11 +1022,15 @@ export function localAuctionReducer(state, action) {
         cashFromB,
       });
 
-      const updatedRoomTeams = state.roomTeams.map((t) => {
+      const hadTeamB = state.roomTeams.some((t) => t.teamId === teamBId);
+      let updatedRoomTeams = state.roomTeams.map((t) => {
         if (t.teamId === teamAId) return updatedA;
         if (t.teamId === teamBId) return updatedB;
         return t;
       });
+      if (!hadTeamB) {
+        updatedRoomTeams.push(updatedB);
+      }
 
       const updatedPlayers = state.players.map((p) => {
         if (p.team === teamAId) {

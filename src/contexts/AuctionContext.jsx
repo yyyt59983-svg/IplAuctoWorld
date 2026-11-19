@@ -3062,14 +3062,41 @@ export const AuctionProvider = ({ children }) => {
   const executeTrade = useCallback(async ({ roomId, partnerTeamId, playerOffered, playerRequested, cashOffered = 0, cashRequested = 0 }) => {
     if (!roomId || !partnerTeamId) return { success: false, reason: 'Invalid parameters' };
 
+    // Helper to ensure trade players are fully hydrated with name, role, photo, cost & overseas status
+    const hydrateTradePlayer = (p) => {
+      if (!p) return null;
+      const pid = typeof p === 'string' ? p : p.id;
+      if (!pid) return null;
+      const baseInfo = IPL_PLAYERS.find((ip) => String(ip.id) === String(pid)) || {};
+      const cost = toFiniteNumber(
+        p.soldPrice ?? p.retentionCost ?? p.cost ?? p.bid ?? baseInfo.basePrice,
+        0
+      );
+      return {
+        ...baseInfo,
+        ...(typeof p === 'object' ? p : {}),
+        id: pid,
+        name: p.name || baseInfo.name || `Player #${pid}`,
+        role: p.role || baseInfo.role || 'Player',
+        image: p.image || baseInfo.image,
+        country: p.country || baseInfo.country || 'India',
+        cost,
+        soldPrice: cost,
+        isOverseas: Boolean(isOverseasPlayer({ ...baseInfo, ...p })),
+      };
+    };
+
+    const hydratedPlayerOffered = hydrateTradePlayer(playerOffered);
+    const hydratedPlayerRequested = hydrateTradePlayer(playerRequested);
+
     if (isLocalRoom(roomId, currentAuction?.server)) {
       if (soloStateManagerRef.current) {
         soloStateManagerRef.current.dispatch({
           type: 'EXECUTE_TRADE',
           teamAId: team?.teamId || team?.team,
           teamBId: partnerTeamId,
-          playerA: playerOffered,
-          playerB: playerRequested,
+          playerA: hydratedPlayerOffered,
+          playerB: hydratedPlayerRequested,
           cashFromA: cashOffered,
           cashFromB: cashRequested,
           now: Date.now(),
@@ -3078,15 +3105,37 @@ export const AuctionProvider = ({ children }) => {
       }
     }
 
-    const partnerTeamDoc = roomTeams.find(t => t.teamId === partnerTeamId);
+    let partnerTeamDoc = roomTeams.find(t => t.teamId === partnerTeamId);
     const myTeamDoc = team || roomTeams.find(t => t.userId === user?.uid);
-    if (!partnerTeamDoc || !myTeamDoc) return { success: false, reason: 'Team not found' };
+    if (!myTeamDoc) return { success: false, reason: 'Your team was not found' };
+
+    // If partner franchise is not currently in roomTeams, initialize it as an unmanaged bot franchise
+    if (!partnerTeamDoc) {
+      const budget = currentAuction?.settings?.budget || 150.0;
+      const isMega = currentAuction?.auctionType === 'mega' || !currentAuction?.auctionType;
+      const initState = isMega
+        ? getTeamInitialState(partnerTeamId, budget)
+        : { budgetRemaining: budget, spent: 0, squad: [], rtmCards: 0 };
+      const teamMeta = TEAMS.find((t) => t.id === partnerTeamId);
+      partnerTeamDoc = {
+        teamId: partnerTeamId,
+        team: partnerTeamId,
+        teamName: teamMeta?.name || partnerTeamId,
+        shortName: teamMeta?.shortName || partnerTeamId,
+        userId: `bot_${partnerTeamId}`,
+        squad: initState.squad || [],
+        budgetRemaining: initState.budgetRemaining ?? budget,
+        spent: initState.spent ?? 0,
+        rtmCards: initState.rtmCards ?? 0,
+        squadCount: (initState.squad || []).length,
+      };
+    }
 
     const val = validatePlayerTrade({
       teamA: myTeamDoc,
       teamB: partnerTeamDoc,
-      playerA: playerOffered,
-      playerB: playerRequested,
+      playerA: hydratedPlayerOffered,
+      playerB: hydratedPlayerRequested,
       cashFromA: cashOffered,
       cashFromB: cashRequested,
       squadLimit: currentAuction?.squadLimit || 25,
@@ -3103,8 +3152,8 @@ export const AuctionProvider = ({ children }) => {
       const decision = evaluateBotTrade({
         botTeam: partnerTeamDoc,
         humanTeam: myTeamDoc,
-        playerOffered,
-        playerRequested,
+        playerOffered: hydratedPlayerOffered,
+        playerRequested: hydratedPlayerRequested,
         cashOffered,
         cashRequested,
         initialBudget: currentAuction?.settings?.budget || 150.0,
@@ -3120,8 +3169,8 @@ export const AuctionProvider = ({ children }) => {
       const { teamA: updatedMe, teamB: updatedPartner } = executePlayerTradeInSquads({
         teamA: myTeamDoc,
         teamB: partnerTeamDoc,
-        playerA: playerOffered,
-        playerB: playerRequested,
+        playerA: hydratedPlayerOffered,
+        playerB: hydratedPlayerRequested,
         cashFromA: cashOffered,
         cashFromB: cashRequested,
       });
@@ -3129,7 +3178,7 @@ export const AuctionProvider = ({ children }) => {
       await set(myRef, updatedMe);
       await set(partnerRef, updatedPartner);
 
-      const tradeDetails = `${playerOffered ? playerOffered.name : '₹' + cashOffered + ' Cr'} ⇄ ${playerRequested ? playerRequested.name : '₹' + cashRequested + ' Cr'}`;
+      const tradeDetails = `${hydratedPlayerOffered ? hydratedPlayerOffered.name : '₹' + cashOffered + ' Cr'} ⇄ ${hydratedPlayerRequested ? hydratedPlayerRequested.name : '₹' + cashRequested + ' Cr'}`;
       const tradeMsg = `🚨 MEGA TRADE COMPLETED: ${myTeamDoc.teamName} and ${partnerTeamDoc.teamName} traded ${tradeDetails}!`;
       await push(ref(rtdbInstance, `auctions/${roomId}/messages`), {
         text: tradeMsg,
@@ -3156,23 +3205,23 @@ export const AuctionProvider = ({ children }) => {
       receiverUserId: partnerTeamDoc.userId,
       receiverTeamId: partnerTeamDoc.teamId,
       receiverTeamName: partnerTeamDoc.teamName,
-      playerOffered: playerOffered ? {
-        id: playerOffered.id,
-        name: playerOffered.name,
-        role: playerOffered.role,
-        image: playerOffered.image,
-        cost: playerOffered.soldPrice ?? playerOffered.retentionCost ?? playerOffered.cost ?? 0,
-        soldPrice: playerOffered.soldPrice ?? playerOffered.retentionCost ?? playerOffered.cost ?? 0,
-        isOverseas: isOverseasPlayer(playerOffered),
+      playerOffered: hydratedPlayerOffered ? {
+        id: hydratedPlayerOffered.id,
+        name: hydratedPlayerOffered.name,
+        role: hydratedPlayerOffered.role,
+        image: hydratedPlayerOffered.image,
+        cost: hydratedPlayerOffered.soldPrice ?? hydratedPlayerOffered.cost ?? 0,
+        soldPrice: hydratedPlayerOffered.soldPrice ?? hydratedPlayerOffered.cost ?? 0,
+        isOverseas: Boolean(hydratedPlayerOffered.isOverseas),
       } : null,
-      playerRequested: playerRequested ? {
-        id: playerRequested.id,
-        name: playerRequested.name,
-        role: playerRequested.role,
-        image: playerRequested.image,
-        cost: playerRequested.soldPrice ?? playerRequested.retentionCost ?? playerRequested.cost ?? 0,
-        soldPrice: playerRequested.soldPrice ?? playerRequested.retentionCost ?? playerRequested.cost ?? 0,
-        isOverseas: isOverseasPlayer(playerRequested),
+      playerRequested: hydratedPlayerRequested ? {
+        id: hydratedPlayerRequested.id,
+        name: hydratedPlayerRequested.name,
+        role: hydratedPlayerRequested.role,
+        image: hydratedPlayerRequested.image,
+        cost: hydratedPlayerRequested.soldPrice ?? hydratedPlayerRequested.cost ?? 0,
+        soldPrice: hydratedPlayerRequested.soldPrice ?? hydratedPlayerRequested.cost ?? 0,
+        isOverseas: Boolean(hydratedPlayerRequested.isOverseas),
       } : null,
       cashOffered: Number(cashOffered || 0),
       cashRequested: Number(cashRequested || 0),
@@ -3182,7 +3231,7 @@ export const AuctionProvider = ({ children }) => {
 
     await set(tradeRef, tradeData);
 
-    const tradeDesc = `${playerOffered ? playerOffered.name : '₹' + cashOffered + ' Cr'} for ${playerRequested ? playerRequested.name : '₹' + cashRequested + ' Cr'}`;
+    const tradeDesc = `${hydratedPlayerOffered ? hydratedPlayerOffered.name : '₹' + cashOffered + ' Cr'} for ${hydratedPlayerRequested ? hydratedPlayerRequested.name : '₹' + cashRequested + ' Cr'}`;
     await push(ref(rtdbInstance, `auctions/${roomId}/messages`), {
       text: `📋 TRADE OFFER: ${myTeamDoc.teamName} offered a trade (${tradeDesc}) to ${partnerTeamDoc.teamName}!`,
       type: 'trade_alert',

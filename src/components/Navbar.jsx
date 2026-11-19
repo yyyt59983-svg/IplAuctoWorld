@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const Navbar = () => {
   return (
-    <header className="relative z-50 w-full bg-transparent border-none">
+    <header className="relative z-50 w-full bg-transparent border-none pt-[max(0.25rem,env(safe-area-inset-top))]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-13 sm:h-15 flex items-center justify-between">
         {/* Website Name and Favicon on the Left */}
         <Link
