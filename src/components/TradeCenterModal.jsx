@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeftRight,
@@ -67,6 +67,7 @@ export default function TradeCenterModal({
   onClose,
   myTeam,
   allTeams = [],
+  targetTeamId = null,
   incomingTrades = [],
   outgoingTrades = [],
   onExecuteTrade,
@@ -112,7 +113,7 @@ export default function TradeCenterModal({
   }, [allTeams, myTeamId]);
 
   const [selectedPartnerId, setSelectedPartnerId] = useState(
-    availableRivalTeams[0]?.teamId || 'MI'
+    targetTeamId || availableRivalTeams[0]?.teamId || 'MI'
   );
   const [selectedPlayerToGive, setSelectedPlayerToGive] = useState(null);
   const [selectedPlayerToReceive, setSelectedPlayerToReceive] = useState(null);
@@ -120,6 +121,16 @@ export default function TradeCenterModal({
   const [tradeStatus, setTradeStatus] = useState(null); // { type: 'success' | 'error', message: string }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [processingTradeId, setProcessingTradeId] = useState(null);
+
+  useEffect(() => {
+    if (targetTeamId && availableRivalTeams.some((t) => t.teamId === targetTeamId)) {
+      setSelectedPartnerId(targetTeamId);
+      setSelectedPlayerToGive(null);
+      setSelectedPlayerToReceive(null);
+      setCashFromMe(0);
+      setTradeStatus(null);
+    }
+  }, [targetTeamId, availableRivalTeams, isOpen]);
 
   const partnerTeam = useMemo(() => {
     const found = availableRivalTeams.find((t) => t.teamId === selectedPartnerId);
@@ -250,27 +261,29 @@ export default function TradeCenterModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/85 backdrop-blur-md overflow-y-auto overscroll-contain">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-[#0e1118] via-[#090b10] to-[#050608] p-5 sm:p-7 text-white shadow-[0_25px_80px_rgba(6,182,212,0.2)]"
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
+          className="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] flex flex-col rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-[#0e1118] via-[#090b10] to-[#050608] p-3.5 sm:p-6 text-white shadow-[0_25px_80px_rgba(6,182,212,0.25)] my-auto overflow-hidden"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
-                <ArrowLeftRight className="h-6 w-6" />
+          {/* Header - Fixed at Top */}
+          <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-cyan-500/30 shrink-0">
+                <ArrowLeftRight className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+                  <span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
                     TRANSFER WINDOW
                   </span>
-                  <span className="text-xs text-slate-400 font-mono">PLAYER SWAP & CASH CONSIDERATIONS</span>
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-mono hidden sm:inline">
+                    PLAYER SWAP & CASH CONSIDERATIONS
+                  </span>
                 </div>
-                <h2 className="text-lg sm:text-2xl font-pixel uppercase tracking-tight text-white mt-0.5">
+                <h2 className="text-base sm:text-2xl font-pixel uppercase tracking-tight text-white mt-0.5">
                   IPL TRADE CENTER
                 </h2>
               </div>
@@ -278,14 +291,14 @@ export default function TradeCenterModal({
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex gap-2 mt-4 p-1 rounded-xl bg-white/[0.03] border border-white/10">
+          {/* Navigation Tabs - Fixed at Top */}
+          <div className="flex gap-2 mt-2.5 sm:mt-3 p-1 rounded-xl bg-white/[0.03] border border-white/10 shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('propose')}
@@ -461,41 +474,70 @@ export default function TradeCenterModal({
             </div>
           ) : (
             /* Propose Transfer View */
-            <>
-              {/* Franchise Selector Bar */}
-              <div className="mt-4">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  Select Trading Partner Franchise:
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                  {availableRivalTeams.map((t) => {
-                    const teamId = t.teamId || t.team;
-                    const meta = TEAMS.find((item) => item.id === teamId);
-                    const isSelected = selectedPartnerId === teamId;
-                    return (
-                      <button
-                        key={teamId}
-                        onClick={() => {
-                          setSelectedPartnerId(teamId);
+            <div className="flex flex-col flex-1 min-h-0">
+              {/* Scrollable Center Body */}
+              <div className="flex-1 overflow-y-auto min-h-0 pr-1 mt-2.5 space-y-3 custom-scrollbar">
+                {/* Target Franchise Highlight Banner */}
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/25 to-black/60 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 border border-white/10 p-1.5 flex items-center justify-center shrink-0">
+                      {partnerTeamObj?.logo ? (
+                        <img
+                          src={partnerTeamObj.logo}
+                          alt={partnerTeamObj.name}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <Shield className="w-5 h-5 text-cyan-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[9px] uppercase font-bold text-cyan-400 tracking-wider">
+                        Target Trading Franchise
+                      </div>
+                      <div className="font-extrabold text-sm sm:text-base text-white truncate">
+                        {partnerTeamObj?.name || selectedPartnerId}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        Squad: {partnerTeam?.squad?.length || 0}/25 players
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+                    <div className="text-left sm:text-right">
+                      <div className="text-[9px] text-slate-400 uppercase font-mono">Purse</div>
+                      <div className="text-xs sm:text-sm font-mono font-bold text-cyan-300">
+                        ₹{formatCrores(partnerTeam?.budgetRemaining)} Cr
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-slate-500 uppercase font-bold hidden sm:inline">
+                        Switch:
+                      </span>
+                      <select
+                        value={selectedPartnerId}
+                        onChange={(e) => {
+                          setSelectedPartnerId(e.target.value);
                           setSelectedPlayerToReceive(null);
                           setTradeStatus(null);
                         }}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                          isSelected
-                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/20'
-                            : 'bg-white/[0.02] border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
-                        }`}
+                        className="bg-[#0b0e14] border border-cyan-500/40 text-cyan-300 text-xs font-bold py-1.5 px-2.5 rounded-xl cursor-pointer focus:outline-none"
+                        title="Switch target team"
                       >
-                        <span>{meta?.shortName || teamId}</span>
-                        <span className="text-[10px] text-slate-500 font-mono">({t.squad?.length || 0})</span>
-                      </button>
-                    );
-                  })}
+                        {availableRivalTeams.map((t) => (
+                          <option key={t.teamId} value={t.teamId} className="bg-[#0b0e14] text-white">
+                            {t.meta?.shortName || t.teamId} - {t.teamName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Trading Workbench: Split Screen */}
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Trading Workbench: Split Screen */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {/* Left: Your Squad */}
                 <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
                   <div className="flex items-center justify-between pb-2 border-b border-white/5">
@@ -717,24 +759,26 @@ export default function TradeCenterModal({
                 </div>
               )}
 
-              {/* Submission Action */}
-              <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-white/10">
-                <div className="text-xs text-slate-400">
+              </div>
+
+              {/* Submission Action - Pinned at bottom */}
+              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-2.5 shrink-0">
+                <div className="text-[11px] sm:text-xs text-slate-400 min-w-0 flex-1 truncate">
                   {validation.isValid ? (
-                    <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
-                      <CheckCircle2 className="w-4 h-4" /> Valid Trade Parameters
+                    <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Valid Deal
                     </span>
                   ) : (
-                    <span className="text-amber-400 flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4" /> {validation.reason}
+                    <span className="text-amber-400 flex items-center gap-1 truncate">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {validation.reason}
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={onClose}
-                    className="py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-all cursor-pointer"
+                    className="py-2 px-3 sm:px-4 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white transition-all cursor-pointer"
                   >
                     Close
                   </button>
@@ -742,24 +786,24 @@ export default function TradeCenterModal({
                   <button
                     onClick={handleTradeSubmit}
                     disabled={!validation.isValid || isSubmitting}
-                    className={`py-2.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                    className={`py-2 px-4 sm:px-6 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
                       validation.isValid && !isSubmitting
                         ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white hover:brightness-110 shadow-lg shadow-cyan-500/25 active:scale-[0.98]'
                         : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/5'
                     }`}
                   >
-                    <ArrowLeftRight className="w-4 h-4" />
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
                     <span>
                       {isSubmitting
                         ? 'Processing...'
                         : isPartnerBot
-                        ? 'EXECUTE TRADE DEAL'
-                        : 'SUBMIT TRADE PROPOSAL'}
+                        ? 'CONFIRM TRADE'
+                        : 'PROPOSE TRADE'}
                     </span>
                   </button>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </motion.div>
       </div>

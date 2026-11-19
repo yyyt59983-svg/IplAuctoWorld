@@ -96,6 +96,12 @@ const AuctionRoom = () => {
    } = useAuction();
    const { user } = useAuth();
    const [isTradeCenterOpen, setIsTradeCenterOpen] = useState(false);
+   const [selectedTradePartnerId, setSelectedTradePartnerId] = useState(null);
+
+   const openTradeWithTeam = (partnerTeamId) => {
+      setSelectedTradePartnerId(partnerTeamId);
+      setIsTradeCenterOpen(true);
+   };
    const [isIncomingTradeDismissed, setIsIncomingTradeDismissed] = useState(false);
    const lastTradeIdRef = useRef(null);
 
@@ -1168,21 +1174,6 @@ const AuctionRoom = () => {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-3 shrink-0">
-               {/* Trade Center / Player Swap Modal Trigger */}
-               <button
-                  onClick={() => setIsTradeCenterOpen(true)}
-                  className="px-2 py-1 sm:px-2.5 sm:py-1.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/50 rounded-lg text-cyan-300 text-[9px] sm:text-[10px] font-black uppercase tracking-wider hover:brightness-125 transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-cyan-500/20 active:scale-95 animate-pulse"
-                  title="Open IPL Franchise Player Transfer & Trade Center"
-               >
-                  <ArrowLeftRight size={13} className="text-cyan-400" />
-                  <span className="inline font-bold">⇄ Trade Center</span>
-                  {incomingTrades?.length > 0 && (
-                     <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-slate-950 animate-bounce">
-                        {incomingTrades.length}
-                     </span>
-                  )}
-               </button>
-
                {/* Solo vs AI Bots Fast Forward / Finish Button */}
                {isSoloVsBots && !spectateMode && (
                   <button
@@ -1261,14 +1252,7 @@ const AuctionRoom = () => {
             <aside className={`${mobileTab === 'squad' ? 'flex' : 'hidden'} md:flex flex-1 md:flex-none md:shrink-0 w-full md:w-56 lg:w-64 xl:w-80 bg-[#0c0d10]/90 backdrop-blur-xl border-r border-white/10 flex-col h-full overflow-hidden relative z-10`}>
                <div className="h-14 compact:h-12 border-b border-white/10 bg-[#0c0d10] flex items-center justify-between px-4 sm:px-6 shrink-0">
                   <span className="text-[10px] compact:text-[9px] font-pixel text-slate-400 uppercase tracking-widest leading-none">Auction Teams</span>
-                  <button
-                     onClick={() => setIsTradeCenterOpen(true)}
-                     className="px-2 py-1 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 rounded-lg text-cyan-300 text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
-                     title="Open IPL Player Trade Center"
-                  >
-                     <ArrowLeftRight size={11} className="text-cyan-400" />
-                     <span>⇄ Trade</span>
-                  </button>
+                  <span className="text-[9px] text-slate-500 font-mono font-bold">10 Franchises</span>
                </div>
 
                <div className="flex-1 overflow-y-auto p-4 compact:p-3 pb-28 sm:pb-8 md:pb-4 custom-scrollbar touch-pan-y min-h-0">
@@ -1308,7 +1292,21 @@ const AuctionRoom = () => {
                                     </div>
                                  </div>
                               </div>
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                 {!isMyTeam && (
+                                    <button
+                                       type="button"
+                                       onClick={(e) => {
+                                          e.stopPropagation();
+                                          openTradeWithTeam(t.id);
+                                       }}
+                                       className="px-2 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 active:scale-95 cursor-pointer shadow-sm shrink-0"
+                                       title={`Trade with ${t.name}`}
+                                    >
+                                       <ArrowLeftRight size={10} className="text-cyan-400" />
+                                       <span>Trade</span>
+                                    </button>
+                                 )}
                                  <div className="text-right">
                                     <span className="text-[10px] compact:text-[9px] font-bold block leading-none text-gray-200">
                                        ₹{formatCrores(teamDoc?.budgetRemaining ?? (teamDoc?.spent != null ? Math.max(0, toFiniteNumber(currentAuction?.settings?.budget, 150) - teamDoc.spent) : getTeamInitialState(t.id, toFiniteNumber(currentAuction?.settings?.budget, 150)).budgetRemaining))} Cr
@@ -1410,18 +1408,20 @@ const AuctionRoom = () => {
                                           </div>
                                        )}
 
-                                       <div className="pt-2 mt-2 border-t border-white/5">
-                                          <button
-                                             onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsTradeCenterOpen(true);
-                                             }}
-                                             className="w-full py-1.5 px-2.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[8.5px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98 cursor-pointer"
-                                          >
-                                             <ArrowLeftRight size={11} className="text-cyan-400" />
-                                             <span>Propose Trade With {t.shortName || t.name.split(' ')[0]}</span>
-                                          </button>
-                                       </div>
+                                       {!isMyTeam && (
+                                          <div className="pt-2 mt-2 border-t border-white/5">
+                                             <button
+                                                onClick={(e) => {
+                                                   e.stopPropagation();
+                                                   openTradeWithTeam(t.id);
+                                                }}
+                                                className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/40 text-cyan-300 text-[9.5px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md active:scale-98 cursor-pointer"
+                                             >
+                                                <ArrowLeftRight size={13} className="text-cyan-400" />
+                                                <span>Trade Players With {t.shortName || t.name}</span>
+                                             </button>
+                                          </div>
+                                       )}
                                     </div>
                                  </motion.div>
                               )}
@@ -1791,16 +1791,6 @@ const AuctionRoom = () => {
                                           </button>
                                        )}
 
-                                       {/* Player Transfer & Trade Center Quick Access */}
-                                       <button
-                                          type="button"
-                                          onClick={() => setIsTradeCenterOpen(true)}
-                                          className="px-3 sm:px-4 h-12 sm:h-14 xl:h-18 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/40 rounded-2xl flex items-center justify-center gap-1.5 text-cyan-300 font-pixel text-[10px] sm:text-xs tracking-wider transition-all active:scale-[0.98] cursor-pointer shadow-md shadow-cyan-500/10 shrink-0"
-                                          title="Open IPL Franchise Player Transfer & Trade Center"
-                                       >
-                                          <ArrowLeftRight size={15} className="text-cyan-400 shrink-0" />
-                                          <span className="font-black uppercase tracking-wider">TRADE</span>
-                                       </button>
 
                                        <button
                                           onClick={handleBid}
@@ -2001,12 +1991,6 @@ const AuctionRoom = () => {
                   <span className={`text-[7px] font-black uppercase tracking-widest ${mobileTab === 'arena' ? 'text-slate-200 opacity-100' : 'text-gray-500 opacity-70'}`}>Arena</span>
                </button>
 
-               <button onClick={() => setIsTradeCenterOpen(true)} className="flex flex-col items-center justify-center w-14 sm:w-16 gap-0.5 transition-all duration-300 text-cyan-400 hover:text-cyan-300 active:scale-95 cursor-pointer">
-                  <div className="p-1 rounded-lg bg-cyan-500/20 border border-cyan-400/30 text-cyan-300">
-                     <ArrowLeftRight size={16} strokeWidth={2.5} />
-                  </div>
-                  <span className="text-[7px] font-black uppercase tracking-widest text-cyan-300">Trade</span>
-               </button>
 
                <button onClick={() => { setMobileTab('activity'); setSidebarTab('activity'); }} className={`flex flex-col items-center justify-center w-14 sm:w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-white translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
                   <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-white/10 text-white' : 'bg-transparent text-gray-400'}`}>
@@ -2471,9 +2455,13 @@ const AuctionRoom = () => {
          {/* IPL Transfer & Trade Center Modal */}
          <TradeCenterModal
             isOpen={isTradeCenterOpen}
-            onClose={() => setIsTradeCenterOpen(false)}
+            onClose={() => {
+               setIsTradeCenterOpen(false);
+               setSelectedTradePartnerId(null);
+            }}
             myTeam={team || contextTeam}
             allTeams={roomTeams}
+            targetTeamId={selectedTradePartnerId}
             incomingTrades={incomingTrades}
             outgoingTrades={outgoingTrades}
             onExecuteTrade={async (tradeData) => {
