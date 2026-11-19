@@ -591,58 +591,6 @@ export const AuctionProvider = ({ children }) => {
         await updateRtdb(rtdbRoomRef, { playerOrder });
       }
 
-      if (disposition === 'start') {
-        // Ensure all remaining franchise slots are populated with bot teams & official retentions
-        try {
-          const budget = toFiniteNumber(roomData.settings?.budget, 150.0);
-          const isMega = (roomData.auctionType || 'mega') === 'mega';
-          const takenIds = new Set(mapRoomPlayers(roomData.players, (p) => p.team).filter(Boolean));
-          const botsToAdd = TEAMS.filter((t) => !takenIds.has(t.id));
-
-          if (botsToAdd.length > 0) {
-            await runTransactionRtdb(ref(rtdb, `auctions/${roomId}/room/players`), (currentPlayers) => {
-              const players = mapRoomPlayers(currentPlayers, (p) => p);
-              const currentTaken = new Set(players.map((p) => p.team).filter(Boolean));
-              const newBots = TEAMS.filter((t) => !currentTaken.has(t.id)).map((t) => {
-                const botInit = isMega ? getTeamInitialState(t.id, budget) : { spent: 0, squadCount: 0 };
-                return {
-                  id: `bot_${t.id}`,
-                  name: t.botName || `${t.name} Bot`,
-                  team: t.id,
-                  teamName: t.name,
-                  isHost: false,
-                  isBot: true,
-                  spent: botInit.spent,
-                  squadCount: botInit.squadCount,
-                };
-              });
-              return newBots.length > 0 ? [...players, ...newBots] : players;
-            });
-
-            await Promise.all(
-              botsToAdd.map((t) => {
-                const botState = isMega ? getTeamInitialState(t.id, budget) : { budgetRemaining: budget, spent: 0, squad: [], rtmCards: 0 };
-                return runTransactionRtdb(
-                  ref(rtdb, `auctions/${roomId}/teams/${roomId}_bot_${t.id}`),
-                  (current) => current ?? {
-                    auctionId: roomId,
-                    userId: `bot_${t.id}`,
-                    teamId: t.id,
-                    teamName: t.name,
-                    budgetRemaining: botState.budgetRemaining,
-                    spent: botState.spent,
-                    squad: botState.squad,
-                    rtmCards: botState.rtmCards,
-                  }
-                );
-              })
-            );
-          }
-        } catch (botInitErr) {
-          console.warn('[auction] Best effort bot team initialization notice:', botInitErr);
-        }
-      }
-
       // Check if room is 1 human vs AI bots
       const isSolo = isSoloBotRoom(roomData?.players || []);
       if (isSolo) {
